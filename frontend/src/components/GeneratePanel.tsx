@@ -52,12 +52,13 @@ export function GeneratePanel({ enabledLanguages, onGenerated }: Props) {
         <div>
           <h2 className="font-semibold">Generate drafts</h2>
           <p className="text-xs text-muted">
-            Paste the facts you want covered. Without source material, the AI writes a discussion post with no factual claims.
+            Paste the facts you want covered, or draft from a fact-checked article on the News page.
+            Without source material, the AI writes a discussion post with no factual claims.
           </p>
         </div>
         <button type="button" disabled={busy !== null} onClick={() => void run('daily')}
                 className="rounded-lg border border-line px-3 py-2 text-sm font-medium hover:bg-paper disabled:opacity-50">
-          {busy === 'daily' ? 'Generating 3 slots…' : "Generate today's 3 discussion drafts"}
+          {busy === 'daily' ? 'Generating 3 slots…' : "Generate today's 3 drafts"}
         </button>
       </div>
 

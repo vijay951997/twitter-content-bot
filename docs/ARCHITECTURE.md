@@ -2,7 +2,7 @@
 
 Human-in-the-loop platform that drafts Tamil Nadu politics and governance posts with AI, checks them against sources, and publishes to X **only after explicit human approval**.
 
-Status: **Phase 2 complete**: foundation, full schema, auth, settings, dashboard, plus AI draft generation with validation. Phase 2 added a small migration (V2) with draft review fields.
+Status: **Phase 3 complete**: foundation, auth, settings, dashboard, AI draft generation, news discovery and cross-source fact-checking. Migrations V2 and V3 added draft review fields and news pipeline fields.
 
 ---
 
@@ -291,13 +291,23 @@ Base path `/api`. All endpoints except login, CSRF priming and health require a 
 | GET | `/api/drafts?status=&page=&size=` | session | Paged drafts, newest first (size ≤ 50) |
 | GET | `/api/drafts/{id}` | session | Full draft: content, language, sources, claims, risk flags, X length, model and prompt version |
 
+| GET | `/api/news/sources` | session | Source registry with last fetch status |
+| POST | `/api/news/sources` | ADMIN + CSRF | Add a source (social media / blog platforms refused) |
+| PUT | `/api/news/sources/{id}` | ADMIN + CSRF | Edit, enable/disable a source |
+| POST | `/api/news/sources/{id}/fetch` | ADMIN/REVIEWER + CSRF | Fetch one source now |
+| POST | `/api/news/fetch` | ADMIN/REVIEWER + CSRF | Fetch all enabled sources now |
+| GET | `/api/news/articles?status=&relevantOnly=&sourceId=&page=&size=` | session | Articles with claims and verification |
+| GET | `/api/news/articles/{id}` | session | One article |
+| POST | `/api/news/articles/{id}/analyse` | ADMIN/REVIEWER + CSRF | AI summary + claim extraction, then verification |
+| POST | `/api/news/articles/{id}/verify` | ADMIN/REVIEWER + CSRF | Re-check claims against newer reports |
+| POST | `/api/news/articles/{id}/draft` | ADMIN/REVIEWER + CSRF | Body `{slot?, language?}`. Draft from verified/attributable claims only |
+
 AI errors map to: not configured → 503, bad key → 502, rate limit/quota → 429, timeout → 504, refusal → 422.
 
 Planned endpoints by phase:
 
 | Phase | Endpoints |
 |---|---|
-| 3 | `GET/POST/PUT /api/sources`, `GET /api/articles`, `GET /api/drafts/{id}/sources` |
 | 4 | `PUT /api/drafts/{id}` (edit), `POST /api/drafts/{id}/approve`, `/reject`, `/regenerate`, `/save-for-later`, `GET /api/drafts/{id}/history` |
 | 5 | `GET /api/x/connect` (PKCE start), `GET /api/x/callback`, `GET /api/x/account`, `DELETE /api/x/account` (revoke), `GET /api/publishing/queue` |
 | 6 | `GET /api/notifications`, `POST /api/notifications/{id}/read`, `GET /api/analytics/summary`, `GET /api/analytics/posts` |
@@ -328,7 +338,31 @@ sequenceDiagram
 - **Traceability.** Each draft stores the model, prompt version (`prompts/system-v1.txt`), raw AI JSON, inputs and a variation group id.
 - **Spend guard.** `ai.max_generations_per_hour` (default 30), counted from the audit log so it holds across restarts and instances.
 
-## 8. Security
+## 8. News discovery and verification (Phase 3)
+
+```mermaid
+flowchart TD
+    R[Source registry<br/>tier 1 official · tier 2 news · tier 3 other] --> F[Feed fetch<br/>robots.txt · ETag/If-Modified-Since · 3 MB cap · XXE-safe]
+    F --> K[Relevance filter<br/>EN + Tamil keywords, party-neutral]
+    K --> S[(news_articles<br/>title, link, date only)]
+    S --> A[AI analysis<br/>original English summary + claims]
+    A --> C[(factual_claims)]
+    C --> M[Candidate reports<br/>other publisher domains, ±72h, similar topic]
+    M --> J[AI match: supports / contradicts]
+    J --> V[VerificationRules<br/>fixed, deterministic]
+    V --> C
+    C --> B[ArticleBrief<br/>verified facts · attributed facts · statements]
+    B --> D[Draft generation<br/>ceiling = VERIFIED only if all facts verified]
+```
+
+- **Copyright.** Only feeds, the publisher's own syndication channel, are read; article pages are never scraped. Feed descriptions are held briefly in memory as analysis input and never stored. Summaries are original.
+- **robots.txt.** RFC 9309 semantics: our group, otherwise `*`; longest match wins; `*` and `$` supported; 4xx = allowed; 5xx/unreachable = don't fetch now. Cached 24 h.
+- **Independence.** Publishers are compared by website domain, so two sections of one newspaper never corroborate each other.
+- **Rules beat the model.** The AI only labels which candidate reports *say the same thing* or *contradict*; statuses come from `VerificationRules`. Supporting and conflicting URLs are always stored article URLs, never model output.
+- **Social media.** x.com, Facebook, Instagram, YouTube, Telegram, WhatsApp, Reddit, blog platforms etc. can't be registered as sources.
+- **Background work** (`NewsScheduler`) is off by default, runs at most every 5 minutes, honours per-source intervals with exponential backoff after failures, and takes a PostgreSQL advisory lock so only one instance runs a cycle. It never drafts or publishes.
+
+## 9. Security
 
 - Session login (BCrypt cost 12), session-fixation protection, HTTP-only `SameSite=Lax` cookie, `secure` flag via `SESSION_COOKIE_SECURE`.
 - CSRF via cookie/header pair; CSP and `X-Frame-Options: DENY` on both nginx and API.
@@ -337,7 +371,7 @@ sequenceDiagram
 - Secrets live only in environment variables. Logs never include passwords or tokens; `/api/system/status` returns booleans only.
 - Phase 5 adds AES-GCM encryption of X tokens at rest with a key from `APP_TOKEN_ENCRYPTION_KEY`, minimum scopes (`tweet.read tweet.write users.read offline.access`), and token revocation on disconnect.
 
-## 9. Decisions and open points
+## 10. Decisions and open points
 
 - **X API access tier.** Posting and reading metrics depend on the X developer plan you hold; this was not assumed. Phase 5 will check the current plan limits and document them before implementing.
 - **Fact-checking honesty.** AI-assisted verification is labelled as assistance; it is never shown as independent confirmation. Only claims with stored supporting URLs can be `VERIFIED`.

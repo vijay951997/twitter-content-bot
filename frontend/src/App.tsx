@@ -6,6 +6,7 @@ import { OverviewPage } from './pages/OverviewPage'
 import { DraftsPage } from './pages/DraftsPage'
 import { SettingsPage } from './pages/SettingsPage'
 import { AuditPage } from './pages/AuditPage'
+import { NewsPage } from './pages/NewsPage'
 
 function Protected() {
   const { user, loading } = useAuth()
@@ -21,6 +22,7 @@ export default function App() {
           <Route path="/login" element={<LoginPage />} />
           <Route element={<Protected />}>
             <Route index element={<OverviewPage />} />
+            <Route path="news" element={<NewsPage />} />
             <Route path="drafts" element={<DraftsPage />} />
             <Route path="settings" element={<SettingsPage />} />
             <Route path="audit" element={<AuditPage />} />

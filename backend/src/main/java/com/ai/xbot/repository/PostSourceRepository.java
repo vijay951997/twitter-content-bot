@@ -8,4 +8,8 @@ import org.springframework.data.jpa.repository.JpaRepository;
 
 public interface PostSourceRepository extends JpaRepository<PostSource, UUID> {
     List<PostSource> findByPostIdIn(Collection<UUID> postIds);
+
+    @org.springframework.data.jpa.repository.Query(
+            "select distinct ps.articleId from PostSource ps where ps.articleId in :articleIds")
+    java.util.Set<UUID> findArticleIdsUsed(Collection<UUID> articleIds);
 }

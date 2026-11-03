@@ -52,6 +52,9 @@ public class SecurityConfig {
                     .requestMatchers("/actuator/**").hasRole("ADMIN")
                     .requestMatchers(HttpMethod.PUT, "/api/settings/**").hasRole("ADMIN")
                     .requestMatchers(HttpMethod.POST, "/api/drafts/**").hasAnyRole("ADMIN", "REVIEWER")
+                    .requestMatchers(HttpMethod.POST, "/api/news/sources").hasRole("ADMIN")
+                    .requestMatchers(HttpMethod.PUT, "/api/news/sources/**").hasRole("ADMIN")
+                    .requestMatchers(HttpMethod.POST, "/api/news/**").hasAnyRole("ADMIN", "REVIEWER")
                     .requestMatchers("/api/**").authenticated()
                     .anyRequest().denyAll())
             .formLogin(form -> form

@@ -100,7 +100,7 @@ export function DraftsPage() {
         </button>
       )}
 
-      <p className="text-xs text-muted">Approve, edit and reject actions arrive in Phase 4. Publishing to X arrives in Phase 5.</p>
+      <p className="text-xs text-muted">"Generate today's 3 drafts" uses the newest fact-checked article for each slot, or a discussion post when there is none. Approve, edit and reject actions arrive in Phase 4. Publishing to X arrives in Phase 5.</p>
     </div>
   )
 }

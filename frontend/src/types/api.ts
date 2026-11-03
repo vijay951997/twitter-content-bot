@@ -122,3 +122,72 @@ export interface Page<T> {
   totalItems: number
   totalPages: number
 }
+
+export type SourceType = 'TAMIL_NEWS' | 'NATIONAL_NEWS' | 'GOVERNMENT' | 'PRESS_RELEASE' | 'ELECTION_COMMISSION' | 'PARTY_OFFICIAL' | 'LEGISLATIVE'
+export type AnalysisStatus = 'NEW' | 'ANALYSED' | 'FAILED' | 'IRRELEVANT'
+
+export interface NewsSource {
+  id: string
+  name: string
+  baseUrl: string
+  feedUrl: string
+  sourceType: SourceType
+  language: LanguageCode
+  primarySource: boolean
+  reliabilityTier: number
+  reliabilityNotes: string | null
+  enabled: boolean
+  fetchIntervalMinutes: number
+  requiresKeywordMatch: boolean
+  lastFetchedAt: string | null
+  lastFetchStatus: string | null
+  lastFetchMessage: string | null
+  consecutiveFailures: number
+}
+
+export type NewsSourceInput = Omit<NewsSource, 'id' | 'lastFetchedAt' | 'lastFetchStatus' | 'lastFetchMessage' | 'consecutiveFailures'>
+
+export interface Claim {
+  id: string
+  text: string
+  type: 'FACT' | 'STATISTIC' | 'ATTRIBUTED_STATEMENT' | 'OPINION'
+  attributedTo: string | null
+  verificationStatus: VerificationStatus
+  verificationMethod: string | null
+  independentSourceCount: number
+  supportingUrls: string[]
+  conflictingUrls: string[]
+  verificationNotes: string | null
+  verifiedAt: string | null
+}
+
+export interface Article {
+  id: string
+  title: string
+  url: string
+  sourceId: string
+  sourceName: string
+  sourceType: SourceType | null
+  primarySource: boolean
+  reliabilityTier: number
+  publishedAt: string | null
+  retrievedAt: string
+  summary: string | null
+  category: string | null
+  language: LanguageCode | null
+  analysisStatus: AnalysisStatus
+  relevant: boolean
+  matchedKeywords: string[]
+  analysisError: string | null
+  analysedAt: string | null
+  verifiedAt: string | null
+  claims: Claim[]
+  usedInDraft: boolean
+}
+
+export interface FetchRun {
+  sourcesChecked: number
+  newArticles: number
+  relevantArticles: number
+  sources: { source: string; status: string; message: string | null; newArticles: number }[]
+}

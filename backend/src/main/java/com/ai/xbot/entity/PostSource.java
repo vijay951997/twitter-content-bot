@@ -37,6 +37,15 @@ public class PostSource {
         this.sourceUrl = sourceUrl;
     }
 
+    public PostSource(UUID postId, String sourceUrl, UUID articleId, UUID claimId) {
+        this(postId, sourceUrl);
+        this.articleId = articleId;
+        this.claimId = claimId;
+    }
+
+    public UUID getArticleId() { return articleId; }
+    public UUID getClaimId() { return claimId; }
+
     public UUID getId() { return id; }
     public UUID getPostId() { return postId; }
     public String getSourceUrl() { return sourceUrl; }

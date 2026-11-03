@@ -3,6 +3,7 @@ import { useAuth } from '../hooks/useAuth'
 
 const nav = [
   { to: '/', label: 'Overview', end: true },
+  { to: '/news', label: 'News' },
   { to: '/drafts', label: 'Drafts' },
   { to: '/settings', label: 'Settings' },
   { to: '/audit', label: 'Audit log' },

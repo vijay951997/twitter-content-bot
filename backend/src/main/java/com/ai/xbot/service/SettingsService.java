@@ -98,6 +98,17 @@ public class SettingsService {
         return Boolean.parseBoolean(value(PUBLISHING_ENABLED));
     }
 
+    /** Raw value of any setting, for settings without a typed accessor. */
+    @Transactional(readOnly = true)
+    public Optional<String> rawValue(String key) {
+        return repository.findById(key).map(ApplicationSetting::getValue);
+    }
+
+    @Transactional(readOnly = true)
+    public boolean flag(String key) {
+        return rawValue(key).map(Boolean::parseBoolean).orElse(false);
+    }
+
     @Transactional(readOnly = true)
     public int maxGenerationsPerHour() {
         return repository.findById(MAX_GENERATIONS_PER_HOUR)

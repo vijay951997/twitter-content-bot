@@ -25,13 +25,13 @@ public class SystemController {
         boolean openAi = properties.openai() != null && properties.openai().configured();
         boolean x = properties.x() != null && properties.x().configured();
         return new SystemStatusDto(
-                "0.2.0",
+                "0.3.0",
                 settingsService.getSchedule().timezone(),
                 openAi,
                 openAi ? properties.openai().model() : null,
                 x,
                 false, // X account connection arrives in Phase 5
                 settingsService.isPublishingEnabled(),
-                "PHASE_2");
+                "PHASE_3");
     }
 }

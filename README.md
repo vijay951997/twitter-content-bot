@@ -10,8 +10,8 @@ AI-assisted drafting and publishing for a personal X account, focused on Tamil N
 |---|---|---|
 | 1 | Spring Boot, PostgreSQL, full Flyway schema, auth, settings, audit, React dashboard, Docker | **Done** |
 | 2 | OpenAI integration, prompt templates, Tamil/English/Tanglish drafts, validation, duplicate checks, draft persistence | **Done** |
-| 3 | News discovery, source registry, claim verification | Next |
-| 4 | Approve / reject / edit / regenerate workflow, audit history | |
+| 3 | News discovery, source registry, robots.txt-aware fetching, AI claim extraction, cross-source verification, drafts from verified news | **Done** |
+| 4 | Approve / reject / edit / regenerate workflow, audit history | Next |
 | 5 | X OAuth 2.0 PKCE, publishing queue, retries, idempotency | |
 | 6 | Scheduler, notifications, analytics | |
 | 7 | Security review, hardening, production docs | |
@@ -64,9 +64,9 @@ npm run dev        # http://localhost:5173
 
 ```bash
 cd backend
-mvn test           # unit tests (79)
-mvn verify         # unit + integration tests on real PostgreSQL via Testcontainers (101 total; needs Docker)
-                   # OpenAI is replaced by a local stub server — tests never call the real API
+mvn test           # unit tests (101)
+mvn verify         # unit + integration tests on real PostgreSQL via Testcontainers (131 total; needs Docker)
+                   # OpenAI and news feeds are replaced by local stub servers — tests never touch the internet
 
 cd frontend
 npm test           # vitest
@@ -116,6 +116,28 @@ Open **Drafts** in the dashboard:
 Without source material the AI writes a discussion post with no factual claims. **Generate today's 3 discussion drafts** does that for all three slots.
 
 All drafts are saved as `GENERATED`. Nothing is published; approval arrives in Phase 4. Generation is capped at 30 requests per hour (`ai.max_generations_per_hour`) to protect API spend.
+
+## News and fact-checking (Phase 3)
+
+Open **News** in the dashboard.
+
+1. **Sources tab:** four starter sources are included: The Hindu (Tamil Nadu), The Hindu (Chennai), BBC Tamil and PIB press releases (off until you test it). Add Tamil dailies, the TN government press-release feed, the Election Commission and official party sites with **+ Add source**. Social media and blog platforms are refused.
+2. **Fetch latest news** reads each feed, honours the site's robots.txt, skips unchanged feeds, and keeps only Tamil Nadu-related items for general feeds. Only the title, link, date and later an original AI summary are stored, never article text.
+3. **Analyse & fact-check** on an article: the AI writes an original summary and extracts the factual claims. Each claim is then compared with reports from *other publishers* from within 72 hours.
+
+| Claim status | Rule |
+|---|---|
+| **Verified** | Stated by an official primary source, or reported by two independent publishers (different websites) |
+| **Single source** | Reported by one reputable publisher only — drafts must attribute it ("According to …") |
+| **Conflicting** | Another publisher reports it differently — shown with both links, never used in drafts |
+| **Unverified** | Opinions, predictions, or only low-reliability sources — never used in drafts |
+
+The AI only judges whether two reports say the same thing; the status comes from these fixed rules. Two sections of the same newspaper never count as independent.
+
+4. **Draft from this** builds a draft only from verified or attributed claims. Such a draft can be marked **Verified** only if every fact in it was verified.
+5. **Generate today's 3 drafts** (Drafts page) now picks the newest unused fact-checked article for each slot's theme, and falls back to a discussion post when there isn't one.
+
+Automatic fetching and analysis are **off** by default. Turn them on with the settings `news.auto_fetch_enabled` and `news.auto_analyse_enabled`; analysis uses OpenAI credits and is capped by `ai.max_analyses_per_hour` (default 60).
 
 ## Upgrading an existing install
 

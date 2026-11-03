@@ -13,7 +13,7 @@
 
     <groupId>com.ai</groupId>
     <artifactId>xbot</artifactId>
-    <version>0.2.0</version>
+    <version>0.3.0</version>
     <name>x-content-bot</name>
     <description>Human-in-the-loop AI content drafting and publishing platform for X</description>
 
@@ -56,6 +56,20 @@
             <groupId>org.postgresql</groupId>
             <artifactId>postgresql</artifactId>
             <scope>runtime</scope>
+        </dependency>
+
+        <!-- RSS / Atom parsing (DOCTYPE disabled by default, safe against XXE) -->
+        <dependency>
+            <groupId>com.rometools</groupId>
+            <artifactId>rome</artifactId>
+            <version>2.1.0</version>
+        </dependency>
+
+        <!-- Strips HTML from feed descriptions -->
+        <dependency>
+            <groupId>org.jsoup</groupId>
+            <artifactId>jsoup</artifactId>
+            <version>1.18.3</version>
         </dependency>
 
         <!-- Tests -->

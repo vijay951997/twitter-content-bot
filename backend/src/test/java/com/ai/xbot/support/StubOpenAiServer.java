@@ -22,14 +22,15 @@ public class StubOpenAiServer implements AutoCloseable {
     private final ConcurrentLinkedQueue<Reply> replies = new ConcurrentLinkedQueue<>();
     private final List<Received> received = new CopyOnWriteArrayList<>();
     private volatile Reply last = new Reply(500, "{}", 0);
+    private volatile java.util.function.Function<String, Reply> handler;
 
     public StubOpenAiServer() throws IOException {
         server = HttpServer.create(new InetSocketAddress("127.0.0.1", 0), 0);
         server.createContext("/v1/chat/completions", exchange -> {
             String body = new String(exchange.getRequestBody().readAllBytes(), StandardCharsets.UTF_8);
             received.add(new Received(exchange.getRequestHeaders().getFirst("Authorization"), body));
-            Reply r = replies.poll();
-            if (r == null) r = last; else last = r;
+            Reply r = handler != null ? handler.apply(body) : replies.poll();
+            if (r == null) r = last; else if (handler == null) last = r;
             if (r.delayMs() > 0) {
                 try { Thread.sleep(r.delayMs()); } catch (InterruptedException ignored) { Thread.currentThread().interrupt(); }
             }
@@ -57,7 +58,14 @@ public class StubOpenAiServer implements AutoCloseable {
         return this;
     }
 
+    /** Answer each request with a function of its body (e.g. route by schema name). */
+    public StubOpenAiServer handler(java.util.function.Function<String, Reply> h) {
+        this.handler = h;
+        return this;
+    }
+
     public void reset() {
+        handler = null;
         replies.clear();
         received.clear();
         last = new Reply(500, "{}", 0);

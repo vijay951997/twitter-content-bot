@@ -2,6 +2,7 @@ package com.ai.xbot.integration.openai;
 
 import com.ai.xbot.config.AppProperties;
 import com.ai.xbot.service.ai.AiDraftGenerator;
+import com.ai.xbot.service.ai.AiJsonClient;
 import com.ai.xbot.service.ai.AiGenerationRequest;
 import com.ai.xbot.service.ai.AiGenerationResult;
 import com.ai.xbot.service.ai.AiGenerationResult.AiDraft;
@@ -21,6 +22,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
+import org.springframework.http.client.BufferingClientHttpRequestFactory;
 import org.springframework.http.client.JdkClientHttpRequestFactory;
 import org.springframework.stereotype.Component;
 import org.springframework.web.client.HttpStatusCodeException;
@@ -34,7 +36,7 @@ import org.springframework.web.client.RestClient;
  * are not retried. The API key is sent only in the Authorization header and is never logged.
  */
 @Component
-public class OpenAiDraftGenerator implements AiDraftGenerator {
+public class OpenAiDraftGenerator implements AiDraftGenerator, AiJsonClient {
 
     private static final Logger log = LoggerFactory.getLogger(OpenAiDraftGenerator.class);
     static final String SCHEMA_NAME = "x_post_drafts";
@@ -52,7 +54,9 @@ public class OpenAiDraftGenerator implements AiDraftGenerator {
         JdkClientHttpRequestFactory factory = new JdkClientHttpRequestFactory(http);
         factory.setReadTimeout(Duration.ofSeconds(config == null ? 60 : config.effectiveTimeoutSeconds()));
         this.restClient = builder
-                .requestFactory(factory)
+                // Buffer the (small) JSON body so a Content-Length header is sent instead of chunked encoding;
+                // some proxies and OpenAI-compatible gateways reject chunked requests.
+                .requestFactory(new BufferingClientHttpRequestFactory(factory))
                 .baseUrl(config == null ? "https://api.openai.com/v1" : config.effectiveBaseUrl())
                 .build();
     }
@@ -64,11 +68,30 @@ public class OpenAiDraftGenerator implements AiDraftGenerator {
 
     @Override
     public AiGenerationResult generate(AiGenerationRequest request) {
+        JsonNode out = complete(request.systemPrompt(), request.userPrompt(), SCHEMA_NAME, DraftOutputSchema.schema());
+        List<AiDraft> drafts = new ArrayList<>();
+        for (JsonNode d : out.path("drafts")) {
+            drafts.add(new AiDraft(
+                    d.path("content").asText(""),
+                    d.path("language").asText(null),
+                    d.path("category").asText(null),
+                    strings(d.path("source_urls")),
+                    strings(d.path("verified_claims")),
+                    strings(d.path("unverified_claims")),
+                    d.path("verification_status").asText(null),
+                    strings(d.path("risk_flags")),
+                    d.path("quality_estimate").isNumber() ? d.path("quality_estimate").asDouble() : null));
+        }
+        return new AiGenerationResult(drafts, out.toString(), null, null);
+    }
+
+    @Override
+    public JsonNode complete(String systemPrompt, String userPrompt, String schemaName, Map<String, Object> schema) {
         if (config == null || !config.configured()) {
             throw new AiServiceException(Kind.NOT_CONFIGURED,
                     "OpenAI is not configured. Set OPENAI_API_KEY and OPENAI_MODEL in .env and restart the backend.");
         }
-        Map<String, Object> body = requestBody(request);
+        Map<String, Object> body = requestBody(systemPrompt, userPrompt, schemaName, schema);
 
         int attempts = config.effectiveMaxRetries() + 1;
         long backoff = config.effectiveRetryBackoffMs();
@@ -83,7 +106,7 @@ public class OpenAiDraftGenerator implements AiDraftGenerator {
                         .body(body)
                         .retrieve()
                         .body(String.class);
-                return parse(response);
+                return parse(response, schemaName);
             } catch (HttpStatusCodeException e) {
                 int status = e.getStatusCode().value();
                 if (status == 401 || status == 403) {
@@ -96,7 +119,6 @@ public class OpenAiDraftGenerator implements AiDraftGenerator {
                 } else if (status >= 500) {
                     last = new AiServiceException(Kind.UNAVAILABLE, "OpenAI is unavailable (HTTP " + status + ").");
                 } else {
-                    // 400/404/422: request or model problem — retrying will not help.
                     throw new AiServiceException(Kind.BAD_RESPONSE,
                             "OpenAI refused the request (HTTP " + status + "): " + errorMessage(e.getResponseBodyAsString()));
                 }
@@ -114,22 +136,22 @@ public class OpenAiDraftGenerator implements AiDraftGenerator {
         throw last;
     }
 
-    Map<String, Object> requestBody(AiGenerationRequest request) {
+    Map<String, Object> requestBody(String systemPrompt, String userPrompt, String schemaName, Map<String, Object> schema) {
         Map<String, Object> body = new LinkedHashMap<>();
         body.put("model", config.model());
         body.put("messages", List.of(
-                Map.of("role", "system", "content", request.systemPrompt()),
-                Map.of("role", "user", "content", request.userPrompt())));
+                Map.of("role", "system", "content", systemPrompt),
+                Map.of("role", "user", "content", userPrompt)));
         body.put("response_format", Map.of(
                 "type", "json_schema",
                 "json_schema", Map.of(
-                        "name", SCHEMA_NAME,
+                        "name", schemaName,
                         "strict", true,
-                        "schema", DraftOutputSchema.schema())));
+                        "schema", schema)));
         return body;
     }
 
-    AiGenerationResult parse(String response) {
+    JsonNode parse(String response, String schemaName) {
         try {
             JsonNode root = objectMapper.readTree(response);
             JsonNode choice = root.path("choices").path(0);
@@ -145,27 +167,10 @@ public class OpenAiDraftGenerator implements AiDraftGenerator {
             if (content == null || content.isBlank()) {
                 throw new AiServiceException(Kind.BAD_RESPONSE, "OpenAI returned an empty answer.");
             }
-
-            JsonNode out = objectMapper.readTree(content);
-            List<AiDraft> drafts = new ArrayList<>();
-            for (JsonNode d : out.path("drafts")) {
-                drafts.add(new AiDraft(
-                        d.path("content").asText(""),
-                        d.path("language").asText(null),
-                        d.path("category").asText(null),
-                        strings(d.path("source_urls")),
-                        strings(d.path("verified_claims")),
-                        strings(d.path("unverified_claims")),
-                        d.path("verification_status").asText(null),
-                        strings(d.path("risk_flags")),
-                        d.path("quality_estimate").isNumber() ? d.path("quality_estimate").asDouble() : null));
-            }
             JsonNode usage = root.path("usage");
-            Integer in = usage.path("prompt_tokens").isInt() ? usage.path("prompt_tokens").asInt() : null;
-            Integer outTokens = usage.path("completion_tokens").isInt() ? usage.path("completion_tokens").asInt() : null;
-            log.info("OpenAI generation ok model={} drafts={} promptTokens={} completionTokens={}",
-                    config.model(), drafts.size(), in, outTokens);
-            return new AiGenerationResult(drafts, content, in, outTokens);
+            log.info("OpenAI call ok schema={} model={} promptTokens={} completionTokens={}", schemaName, config.model(),
+                    usage.path("prompt_tokens").asText("?"), usage.path("completion_tokens").asText("?"));
+            return objectMapper.readTree(content);
         } catch (AiServiceException e) {
             throw e;
         } catch (Exception e) {
@@ -173,11 +178,12 @@ public class OpenAiDraftGenerator implements AiDraftGenerator {
         }
     }
 
-    private static List<String> strings(JsonNode array) {
+    static List<String> strings(JsonNode array) {
         List<String> list = new ArrayList<>();
         if (array != null && array.isArray()) array.forEach(n -> { if (!n.asText("").isBlank()) list.add(n.asText().trim()); });
         return list;
     }
+
 
     private String errorMessage(String body) {
         try {

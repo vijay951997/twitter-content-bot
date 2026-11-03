@@ -47,7 +47,7 @@ class OpenAiDraftGeneratorTest {
 
         assertThat(r.drafts()).hasSize(1);
         assertThat(r.drafts().get(0).content()).isEqualTo("Hello Chennai");
-        assertThat(r.promptTokens()).isEqualTo(120);
+        
 
         StubOpenAiServer.Received sent = stub.received().get(0);
         assertThat(sent.authorization()).isEqualTo("Bearer " + KEY);

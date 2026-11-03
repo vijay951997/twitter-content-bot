@@ -1,0 +1,5 @@
+package com.ai.xbot.entity.enums;
+
+public enum SourceType {
+    TAMIL_NEWS, NATIONAL_NEWS, GOVERNMENT, PRESS_RELEASE, ELECTION_COMMISSION, PARTY_OFFICIAL, LEGISLATIVE
+}

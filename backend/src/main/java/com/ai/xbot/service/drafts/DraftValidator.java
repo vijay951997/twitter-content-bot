@@ -19,9 +19,9 @@ import java.util.regex.Pattern;
  *   <li>must be written in the requested language</li>
  *   <li>may only cite URLs the user supplied; a draft whose text contains any other link is discarded,
  *       and invented entries in source_urls are dropped and flagged</li>
- *   <li>verification status is capped: no source material → UNVERIFIED; the AI reading supplied notes
- *       is never treated as independent verification, so VERIFIED is lowered to PARTIALLY_VERIFIED
- *       (true verification arrives with the Phase 3 fact-checking engine)</li>
+ *   <li>verification status is capped by where the facts came from: no material → UNVERIFIED; user notes →
+ *       at most PARTIALLY_VERIFIED; VERIFIED only when every fact came from claims the verification engine
+ *       confirmed. The AI's own label can lower the status but never raise it.</li>
  * </ul>
  */
 public final class DraftValidator {
@@ -48,6 +48,18 @@ public final class DraftValidator {
 
     public static Outcome validate(AiDraft d, ContentLanguage expected, PostSlot slot,
                                    List<String> suppliedUrls, boolean hasSourceMaterial) {
+        return validate(d, expected, slot, suppliedUrls,
+                hasSourceMaterial ? VerificationStatus.PARTIALLY_VERIFIED : VerificationStatus.UNVERIFIED);
+    }
+
+    /**
+     * @param ceiling the highest verification status this draft can have, decided by where its facts came from:
+     *                UNVERIFIED (no material), PARTIALLY_VERIFIED (user notes or single-source claims) or
+     *                VERIFIED (only claims verified by the Phase 3 engine)
+     */
+    public static Outcome validate(AiDraft d, ContentLanguage expected, PostSlot slot,
+                                   List<String> suppliedUrls, VerificationStatus ceiling) {
+        boolean hasSourceMaterial = ceiling != VerificationStatus.UNVERIFIED;
         String content = d.content() == null ? "" : d.content().strip();
         if (content.isEmpty()) return new Rejected("Empty draft");
 
@@ -87,7 +99,7 @@ public final class DraftValidator {
 
         List<String> verified = nonNull(d.verifiedClaims());
         List<String> unverified = nonNull(d.unverifiedClaims());
-        VerificationStatus status = capStatus(d.verificationStatus(), hasSourceMaterial);
+        VerificationStatus status = capStatus(d.verificationStatus(), ceiling);
         if (!hasSourceMaterial && !verified.isEmpty()) {
             // Nothing was supplied, so nothing can be "verified".
             unverified = new ArrayList<>(unverified);
@@ -101,14 +113,21 @@ public final class DraftValidator {
     }
 
     static VerificationStatus capStatus(String aiStatus, boolean hasSourceMaterial) {
-        if (!hasSourceMaterial) return VerificationStatus.UNVERIFIED;
+        return capStatus(aiStatus, hasSourceMaterial ? VerificationStatus.PARTIALLY_VERIFIED : VerificationStatus.UNVERIFIED);
+    }
+
+    /** The AI's own label can lower the status but never raise it above the ceiling. */
+    static VerificationStatus capStatus(String aiStatus, VerificationStatus ceiling) {
+        if (ceiling == VerificationStatus.UNVERIFIED) return VerificationStatus.UNVERIFIED;
         VerificationStatus s;
         try {
             s = aiStatus == null ? VerificationStatus.UNVERIFIED : VerificationStatus.valueOf(aiStatus);
         } catch (IllegalArgumentException e) {
             s = VerificationStatus.UNVERIFIED;
         }
-        return s == VerificationStatus.VERIFIED ? VerificationStatus.PARTIALLY_VERIFIED : s;
+        if (s == VerificationStatus.CONFLICTING_INFORMATION || s == VerificationStatus.UNVERIFIED) return s;
+        if (ceiling == VerificationStatus.PARTIALLY_VERIFIED) return VerificationStatus.PARTIALLY_VERIFIED;
+        return s; // ceiling VERIFIED: VERIFIED or PARTIALLY_VERIFIED as the AI judged
     }
 
     static String category(String raw, PostSlot slot) {

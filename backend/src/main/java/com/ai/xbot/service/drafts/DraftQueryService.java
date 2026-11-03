@@ -48,7 +48,11 @@ public class DraftQueryService {
 
     private Map<UUID, List<String>> urlsFor(List<UUID> ids) {
         if (ids.isEmpty()) return Map.of();
-        return sources.findByPostIdIn(ids).stream().collect(Collectors.groupingBy(PostSource::getPostId,
-                LinkedHashMap::new, Collectors.mapping(PostSource::getSourceUrl, Collectors.toList())));
+        Map<UUID, List<String>> out = new LinkedHashMap<>();
+        for (PostSource ps : sources.findByPostIdIn(ids)) {
+            List<String> l = out.computeIfAbsent(ps.getPostId(), k -> new ArrayList<>());
+            if (!l.contains(ps.getSourceUrl())) l.add(ps.getSourceUrl());
+        }
+        return out;
     }
 }
