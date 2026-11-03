@@ -26,7 +26,7 @@ public final class LanguageDetector {
     public static ScriptStats stats(String text) {
         int tamil = 0, latin = 0;
         String withoutUrls = text == null ? "" : text.replaceAll("https?://\\S+", " ")
-                .replaceAll("[#@]\\w+", " ");
+                .replaceAll("[#@][\\p{L}\\p{M}\\p{N}_]+", " "); // hashtags/mentions in any script
         for (int cp : withoutUrls.codePoints().toArray()) {
             if (cp >= 0x0B80 && cp <= 0x0BFF) {
                 if (Character.isLetter(cp) || Character.getType(cp) == Character.NON_SPACING_MARK

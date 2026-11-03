@@ -20,8 +20,9 @@ public interface NewsArticleRepository extends JpaRepository<NewsArticle, UUID> 
             where (:status is null or a.analysisStatus = :status)
               and (:relevantOnly = false or a.relevant = true)
               and (:sourceId is null or a.sourceId = :sourceId)
+              and (:focusOnly = false or a.focusMatch = true)
             order by coalesce(a.publishedAt, a.retrievedAt) desc""")
-    Page<NewsArticle> search(AnalysisStatus status, boolean relevantOnly, UUID sourceId, Pageable pageable);
+    Page<NewsArticle> search(AnalysisStatus status, boolean relevantOnly, UUID sourceId, boolean focusOnly, Pageable pageable);
 
     /** Analysed articles from other sources in a time window — candidates for corroboration. */
     @Query("""
@@ -43,7 +44,7 @@ public interface NewsArticleRepository extends JpaRepository<NewsArticle, UUID> 
               and a.topicCategory in :categories
               and coalesce(a.publishedAt, a.retrievedAt) >= :since
               and not exists (select 1 from PostSource ps where ps.articleId = a.id)
-            order by coalesce(a.publishedAt, a.retrievedAt) desc""")
+            order by a.focusMatch desc, coalesce(a.publishedAt, a.retrievedAt) desc""")
     List<NewsArticle> findUnusedAnalysed(Collection<String> categories, Instant since, Pageable pageable);
 
     long countByAnalysisStatus(AnalysisStatus status);

@@ -176,7 +176,7 @@ export interface NewsSource {
   id: string
   name: string
   baseUrl: string
-  feedUrl: string
+  feedUrl: string | null
   sourceType: SourceType
   language: LanguageCode
   primarySource: boolean
@@ -229,6 +229,7 @@ export interface Article {
   verifiedAt: string | null
   claims: Claim[]
   usedInDraft: boolean
+  focusMatch: boolean
 }
 
 export interface FetchRun {
@@ -236,4 +237,15 @@ export interface FetchRun {
   newArticles: number
   relevantArticles: number
   sources: { source: string; status: string; message: string | null; newArticles: number }[]
+}
+
+export interface ContentFocus {
+  voice: string
+  themeMorning: string
+  themeAfternoon: string
+  themeEvening: string
+  hashtags: string[]
+  maxHashtags: number
+  focusKeywords: string[]
+  focusOnly: boolean
 }

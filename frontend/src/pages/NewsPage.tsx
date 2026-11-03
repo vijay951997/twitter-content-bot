@@ -29,6 +29,7 @@ export function NewsPage() {
 
   const [tab, setTab] = useState<'articles' | 'sources'>('articles')
   const [filter, setFilter] = useState<'' | AnalysisStatus>('')
+  const [focusOnly, setFocusOnly] = useState(false)
   const [articles, setArticles] = useState<Article[]>([])
   const [page, setPage] = useState(0)
   const [hasMore, setHasMore] = useState(false)
@@ -43,12 +44,13 @@ export function NewsPage() {
     try {
       const q = new URLSearchParams({ page: String(p), size: '20', relevantOnly: 'true' })
       if (filter) q.set('status', filter)
+      if (focusOnly) q.set('focusOnly', 'true')
       const res = await api.get<Page<Article>>(`/api/news/articles?${q}`)
       setArticles((prev) => (replace ? res.items : [...prev, ...res.items]))
       setPage(p)
       setHasMore(p + 1 < res.totalPages)
     } catch (e) { setError(errorText(e)) }
-  }, [filter])
+  }, [filter, focusOnly])
 
   const loadSources = useCallback(async () => {
     try { setSources(await api.get<NewsSource[]>('/api/news/sources')) } catch (e) { setError(errorText(e)) }
@@ -130,6 +132,10 @@ export function NewsPage() {
                 {f.label}
               </button>
             ))}
+            <button onClick={() => setFocusOnly(!focusOnly)}
+                    className={`rounded-full px-3 py-1 text-sm ${focusOnly ? 'bg-amber-500 text-white' : 'border border-amber-300 bg-amber-50 text-amber-900'}`}>
+              ★ My focus only
+            </button>
           </div>
           {articles.length === 0 && (
             <div className="rounded-xl border border-dashed border-line bg-white p-8 text-center text-sm text-muted">
@@ -173,11 +179,11 @@ export function NewsPage() {
                   <tr key={s.id} className={s.enabled ? '' : 'opacity-60'}>
                     <td className="px-4 py-3">
                       <div className="font-medium">{s.name}{!s.enabled && <span className="ml-2 text-xs font-normal text-muted">(off)</span>}</div>
-                      <div className="text-xs text-muted">{SOURCE_TYPE_LABELS[s.sourceType]} · {s.language} · every {s.fetchIntervalMinutes} min</div>
+                      <div className="text-xs text-muted">{SOURCE_TYPE_LABELS[s.sourceType]} · {s.language} · {s.feedUrl ? `every ${s.fetchIntervalMinutes} min` : 'manual: paste releases in Drafts with their link'}</div>
                     </td>
                     <td className="px-4 py-3 text-xs">{TIER_LABELS[s.reliabilityTier]}{s.primarySource && ' · primary'}</td>
                     <td className="px-4 py-3 text-xs">
-                      {s.lastFetchedAt ? (
+                      {!s.feedUrl ? <span className="text-muted">No feed</span> : s.lastFetchedAt ? (
                         <>
                           <div className={FETCH_STATUS_TONE[s.lastFetchStatus ?? ''] ?? ''}>{s.lastFetchMessage ?? s.lastFetchStatus}</div>
                           <div className="text-muted">{new Date(s.lastFetchedAt).toLocaleString('en-IN', { timeZone: tz })}</div>
@@ -185,7 +191,7 @@ export function NewsPage() {
                       ) : <span className="text-muted">Never</span>}
                     </td>
                     <td className="whitespace-nowrap px-4 py-3 text-right text-xs">
-                      {canAct && s.enabled && <button disabled={fetching} onClick={() => void fetchNow(s.id)} className="mr-3 text-accent hover:underline">Fetch</button>}
+                      {canAct && s.enabled && s.feedUrl && <button disabled={fetching} onClick={() => void fetchNow(s.id)} className="mr-3 text-accent hover:underline">Fetch</button>}
                       {isAdmin && <button onClick={() => setEditing(s)} className="text-accent hover:underline">Edit</button>}
                     </td>
                   </tr>

@@ -107,6 +107,38 @@ public class SettingsService {
         return enabled;
     }
 
+    @Transactional(readOnly = true)
+    public com.ai.xbot.dto.ContentFocusDto getFocus() {
+        return new com.ai.xbot.dto.ContentFocusDto(
+                rawValue("content.voice").orElse(""),
+                rawValue("content.theme_morning").orElse(""),
+                rawValue("content.theme_afternoon").orElse(""),
+                rawValue("content.theme_evening").orElse(""),
+                split(rawValue("content.hashtags").orElse("")),
+                Integer.parseInt(rawValue("content.max_hashtags").orElse("3")),
+                split(rawValue("news.focus_keywords").orElse("")),
+                flag("news.focus_only"));
+    }
+
+    @Transactional
+    public com.ai.xbot.dto.ContentFocusDto updateFocus(com.ai.xbot.dto.ContentFocusDto f, UUID actorId) {
+        var before = getFocus();
+        set("content.voice", f.voice().strip(), actorId);
+        set("content.theme_morning", f.themeMorning().strip(), actorId);
+        set("content.theme_afternoon", f.themeAfternoon().strip(), actorId);
+        set("content.theme_evening", f.themeEvening().strip(), actorId);
+        set("content.hashtags", String.join(", ", f.hashtags().stream().map(String::strip).distinct().toList()), actorId);
+        set("content.max_hashtags", f.maxHashtags().toString(), actorId);
+        set("news.focus_keywords", String.join(", ", f.focusKeywords().stream().map(k -> k.strip().toLowerCase(java.util.Locale.ROOT)).distinct().toList()), actorId);
+        set("news.focus_only", Boolean.toString(f.focusOnly()), actorId);
+        auditService.record(actorId, ActorType.USER, "SETTINGS_FOCUS_UPDATED", "application_settings", null, before, f, null);
+        return getFocus();
+    }
+
+    private static List<String> split(String csv) {
+        return Arrays.stream(csv.split(",")).map(String::strip).filter(s -> !s.isEmpty()).toList();
+    }
+
     /** Raw value of any setting, for settings without a typed accessor. */
     @Transactional(readOnly = true)
     public Optional<String> rawValue(String key) {

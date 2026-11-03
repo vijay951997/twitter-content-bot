@@ -53,6 +53,7 @@ export function ArticleCard({ article: a, timezone, canAct, onChange, onDrafted 
   return (
     <article className="rounded-xl border border-line bg-white p-5">
       <div className="flex flex-wrap items-center gap-2 text-xs text-muted">
+        {a.focusMatch && <span className="rounded-full bg-amber-100 px-2 py-0.5 font-medium text-amber-900">★ Focus</span>}
         <span className="font-medium text-ink">{a.sourceName}</span>
         {a.primarySource && <span className="rounded-full bg-emerald-50 px-2 py-0.5 font-medium text-emerald-800">Official source</span>}
         <span>· {new Date(when).toLocaleString('en-IN', { timeZone: timezone, dateStyle: 'medium', timeStyle: 'short' })}</span>

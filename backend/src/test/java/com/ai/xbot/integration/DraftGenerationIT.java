@@ -108,10 +108,27 @@ class DraftGenerationIT extends AbstractPostgresIT {
 
         String id = jdbc.queryForObject("select id from generated_posts limit 1", UUID.class).toString();
         mvc.perform(get("/api/drafts/" + id).session(session)).andExpect(status().isOk())
-                .andExpect(jsonPath("$.promptVersion").value("v1"))
+                .andExpect(jsonPath("$.promptVersion").value("v2"))
                 .andExpect(jsonPath("$.aiModel").value("test-model"));
         mvc.perform(get("/api/drafts?status=GENERATED").session(session)).andExpect(status().isOk())
                 .andExpect(jsonPath("$.totalItems").value(2));
+    }
+
+    @Test
+    @DisplayName("A pasted official TN DIPR release (dipr.tn.gov.in link) allows a VERIFIED draft; the prompt carries the voice")
+    void officialSourceAllowsVerified() throws Exception {
+        String dipr = "https://www.dipr.tn.gov.in/press/2026/11/release-1";
+        STUB.reply(200, completion(drafts(draft("The Tamil Nadu government has launched a new scheme for farmers. #TVK", "en",
+                List.of(dipr), "VERIFIED"))));
+        mvc.perform(post("/api/drafts/generate").session(login()).with(csrf()).contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"slot\":\"MORNING\",\"language\":\"en\",\"sourceNotes\":\"Government launched a scheme for farmers.\","
+                                + "\"sourceUrls\":[\"" + dipr + "\"]}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.created[0].verificationStatus").value("VERIFIED"));
+        String system = STUB.received().get(0).body();
+        assertThat(system).contains("TVK member").contains("#CMVijay");
+        assertThat(jdbc.queryForObject("select count(*) from news_sources where base_url='https://www.dipr.tn.gov.in/' "
+                + "and is_primary_source and feed_url is null", Long.class)).isEqualTo(1);
     }
 
     @Test

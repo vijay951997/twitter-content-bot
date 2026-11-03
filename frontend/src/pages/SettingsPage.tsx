@@ -6,6 +6,7 @@ import { LANGUAGES, mixTotal } from '../services/settings'
 import type { ContentSettings, ScheduleSettings } from '../types/api'
 import { ErrorBanner } from '../components/ErrorBanner'
 import { XConnectionPanel } from '../components/XConnectionPanel'
+import { ContentFocusPanel } from '../components/ContentFocusPanel'
 
 function errorText(e: unknown): string {
   if (e instanceof ApiError) {
@@ -63,6 +64,8 @@ export function SettingsPage() {
       {msg && <div className="rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-700">{msg}</div>}
 
       <XConnectionPanel canEdit={canEdit} />
+
+      <ContentFocusPanel canEdit={canEdit} />
 
       {sched && (
         <section className="rounded-xl border border-line bg-white p-5">

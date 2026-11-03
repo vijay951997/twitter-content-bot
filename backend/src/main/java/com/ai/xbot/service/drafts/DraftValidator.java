@@ -32,6 +32,7 @@ public final class DraftValidator {
     public static final String FLAG_AI_URL_REMOVED = "AI_URL_REMOVED";
     public static final String FLAG_HAS_UNVERIFIED_CLAIMS = "HAS_UNVERIFIED_CLAIMS";
 
+    private static final Pattern HASHTAG = Pattern.compile("(?<![\\p{L}\\p{M}\\p{N}_])#[\\p{L}\\p{M}\\p{N}_]+");
     private static final Pattern URL_IN_TEXT = Pattern.compile("https?://\\S+", Pattern.CASE_INSENSITIVE);
     private static final Pattern CATEGORY_CHARS = Pattern.compile("[^A-Z0-9_]");
 
@@ -59,6 +60,11 @@ public final class DraftValidator {
      */
     public static Outcome validate(AiDraft d, ContentLanguage expected, PostSlot slot,
                                    List<String> suppliedUrls, VerificationStatus ceiling) {
+        return validate(d, expected, slot, suppliedUrls, ceiling, Integer.MAX_VALUE);
+    }
+
+    public static Outcome validate(AiDraft d, ContentLanguage expected, PostSlot slot,
+                                   List<String> suppliedUrls, VerificationStatus ceiling, int maxHashtags) {
         boolean hasSourceMaterial = ceiling != VerificationStatus.UNVERIFIED;
         String content = d.content() == null ? "" : d.content().strip();
         if (content.isEmpty()) return new Rejected("Empty draft");
@@ -66,6 +72,11 @@ public final class DraftValidator {
         int length = XTextLength.weightedLength(content);
         if (length > XTextLength.MAX_WEIGHTED_LENGTH) {
             return new Rejected("Too long for X (" + length + "/" + XTextLength.MAX_WEIGHTED_LENGTH + ")");
+        }
+
+        int tags = hashtagCount(content);
+        if (tags > maxHashtags) {
+            return new Rejected("Too many hashtags (" + tags + ", limit " + maxHashtags + ")");
         }
 
         if (!LanguageDetector.matches(content, expected)) {
@@ -110,6 +121,13 @@ public final class DraftValidator {
 
         return new Accepted(content, expected, category(d.category(), slot), urls, verified, unverified, status,
                 riskFlags, quality(d.qualityEstimate()), length);
+    }
+
+    public static int hashtagCount(String text) {
+        Matcher m = HASHTAG.matcher(text);
+        int n = 0;
+        while (m.find()) n++;
+        return n;
     }
 
     static VerificationStatus capStatus(String aiStatus, boolean hasSourceMaterial) {

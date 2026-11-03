@@ -36,8 +36,8 @@ public class NewsQueryService {
     }
 
     @Transactional(readOnly = true)
-    public PageDto<ArticleDto> list(AnalysisStatus status, boolean relevantOnly, UUID sourceId, int page, int size) {
-        Page<NewsArticle> p = articles.search(status, relevantOnly, sourceId,
+    public PageDto<ArticleDto> list(AnalysisStatus status, boolean relevantOnly, UUID sourceId, boolean focusOnly, int page, int size) {
+        Page<NewsArticle> p = articles.search(status, relevantOnly, sourceId, focusOnly,
                 PageRequest.of(Math.max(0, page), Math.max(1, Math.min(size, 50))));
         List<UUID> ids = p.getContent().stream().map(NewsArticle::getId).toList();
         Map<UUID, List<FactualClaim>> claimMap = ids.isEmpty() ? Map.of() : claims.findByArticleIdIn(ids).stream()
@@ -69,6 +69,6 @@ public class NewsQueryService {
                 s != null && s.isPrimarySource(), s == null ? 3 : s.getReliabilityTier(), a.getPublishedAt(),
                 a.getRetrievedAt(), a.getSummary(), a.getTopicCategory(), a.getLanguage() == null ? null : a.getLanguage().code(),
                 a.getAnalysisStatus().name(), a.isRelevant(), a.getMatchedKeywords(), a.getAnalysisError(),
-                a.getAnalysedAt(), a.getVerifiedAt(), claimDtos, used);
+                a.getAnalysedAt(), a.getVerifiedAt(), claimDtos, used, a.isFocusMatch());
     }
 }

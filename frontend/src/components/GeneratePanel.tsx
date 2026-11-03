@@ -96,7 +96,7 @@ export function GeneratePanel({ enabledLanguages, onGenerated }: Props) {
       <label className="block text-sm">
         <span className="font-medium">Source links <span className="font-normal text-muted">(optional, up to 5 — the only links a draft may cite)</span></span>
         <textarea className={`${input} min-h-16 font-mono text-xs`} value={urls} onChange={(e) => setUrls(e.target.value)}
-                  placeholder="https://… (one per line)" />
+                  placeholder="https://… (one per line). A dipr.tn.gov.in link counts as an official source." />
       </label>
 
       <button disabled={busy !== null} className="rounded-lg bg-accent px-4 py-2 text-sm font-medium text-white disabled:opacity-50">

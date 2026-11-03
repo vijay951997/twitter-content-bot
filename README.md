@@ -64,8 +64,8 @@ npm run dev        # http://localhost:5173
 
 ```bash
 cd backend
-mvn test           # unit tests (107)
-mvn verify         # unit + integration tests on real PostgreSQL via Testcontainers (152 total; needs Docker)
+mvn test           # unit tests (111)
+mvn verify         # unit + integration tests on real PostgreSQL via Testcontainers (157 total; needs Docker)
                    # OpenAI, news feeds and the X API are replaced by local stub servers — tests never touch the internet
 
 cd frontend
@@ -154,6 +154,18 @@ Automatic fetching and analysis are **off** by default. Turn them on with the se
 - The publisher runs every 30 seconds. Before sending, it re-checks that the approval is still valid, that the text matches the approved text, and that the publishing switch is on.
 - Temporary X errors (429, 5xx) retry with backoff. A post that misses its time by more than an hour goes back to review instead of posting late.
 - **History** on each draft shows who generated, edited, approved and published it.
+
+## Content focus
+
+**Settings → Content focus** decides the perspective and topics of new drafts:
+- **Voice:** who is speaking. The default is a TVK supporter writing about CM C. Joseph Vijay and the TVK government's schemes.
+- **Slot themes:** morning covers new schemes and government orders; afternoon covers CM Vijay updates and party news; evening covers benefits for people.
+- **Hashtags:** a list the AI picks 1–3 from, plus at most one scheme- or event-specific tag built from the source. Live "trending" data isn't fetched, because the X API charges per lookup; update the list yourself.
+- **Focus keywords** (English and Tamil): matching news is marked ★ and preferred for daily drafts. Tick *Only keep news that matches* to drop everything else.
+
+The honesty rules in the system prompt (`prompts/system-v2.txt`) can't be changed from the dashboard: facts only from sources, no invented figures or quotes, opinions written as opinions, and no personal attacks on opponents. Fact-checking stays neutral whatever the voice.
+
+**TN DIPR** is registered as an official manual source (it has no RSS feed). Paste a DIPR press release into Drafts with its `dipr.tn.gov.in` link: facts from it can then be marked Verified.
 
 ## Upgrading an existing install
 

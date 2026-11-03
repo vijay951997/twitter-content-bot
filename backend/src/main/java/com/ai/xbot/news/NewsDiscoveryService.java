@@ -39,6 +39,7 @@ public class NewsDiscoveryService {
     private final AuditService audit;
     private final TransactionTemplate tx;
     private final Clock clock;
+    private final com.ai.xbot.service.SettingsService settings;
 
     /** articleId -> excerpt, kept briefly for analysis. Bounded; lost on restart (analysis then uses the title). */
     private final Map<UUID, String> excerpts = Collections.synchronizedMap(new LinkedHashMap<>(256, 0.75f, true) {
@@ -47,7 +48,9 @@ public class NewsDiscoveryService {
     private final Set<UUID> inProgress = ConcurrentHashMap.newKeySet();
 
     public NewsDiscoveryService(NewsSourceRepository sources, NewsArticleRepository articles, FeedClient feeds,
-                                ContentHasher hasher, AuditService audit, TransactionTemplate tx, Clock clock) {
+                                ContentHasher hasher, AuditService audit, TransactionTemplate tx, Clock clock,
+                                com.ai.xbot.service.SettingsService settings) {
+        this.settings = settings;
         this.sources = sources;
         this.articles = articles;
         this.feeds = feeds;
@@ -82,6 +85,9 @@ public class NewsDiscoveryService {
 
     public FetchRunDto fetchSource(UUID sourceId, UUID actor) {
         NewsSource s = sources.findById(sourceId).orElseThrow(() -> new NotFoundException("Source not found"));
+        if (s.getFeedUrl() == null) {
+            throw new com.ai.xbot.exception.BadRequestException("This source has no feed. Paste its releases in Drafts with their link.");
+        }
         int[] counts = fetchOne(s);
         NewsSource refreshed = sources.findById(sourceId).orElse(s);
         return new FetchRunDto(1, counts[0], counts[1],
@@ -93,6 +99,7 @@ public class NewsDiscoveryService {
         if (!inProgress.add(source.getId())) return new int[]{0, 0};
         try {
             FeedResult result = feeds.fetch(source.getFeedUrl(), source.getEtag(), source.getLastModified());
+            var focus = settings.getFocus();
             return tx.execute(st -> {
                 NewsSource s = sources.findById(source.getId()).orElseThrow();
                 int created = 0, relevant = 0;
@@ -101,12 +108,16 @@ public class NewsDiscoveryService {
                         String url = UrlNormalizer.normalize(item.link());
                         if (articles.existsByOriginalUrl(url)) continue;
                         RelevanceFilter.Result rel = RelevanceFilter.evaluate(item.title(), item.excerpt(), s.isRequiresKeywordMatch());
-                        NewsArticle a = articles.save(new NewsArticle(s.getId(), item.title(), url, item.publishedAt(),
-                                Instant.now(clock), s.getLanguage(), hasher.hash(item.title()), rel.relevant(),
-                                rel.matched(), rel.category()));
+                        boolean focusMatch = RelevanceFilter.matchesFocus(item.title(), item.excerpt(), focus.focusKeywords());
+                        boolean keep = rel.relevant() && (!focus.focusOnly() || focusMatch);
+                        NewsArticle article = new NewsArticle(s.getId(), item.title(), url, item.publishedAt(),
+                                Instant.now(clock), s.getLanguage(), hasher.hash(item.title()), keep,
+                                rel.matched(), rel.category());
+                        article.setFocusMatch(focusMatch);
+                        NewsArticle a = articles.save(article);
                         if (item.excerpt() != null && !item.excerpt().isBlank()) excerpts.put(a.getId(), item.excerpt());
                         created++;
-                        if (rel.relevant()) relevant++;
+                        if (a.isRelevant()) relevant++;
                     }
                 }
                 String message = result.status() == FeedResult.Status.OK

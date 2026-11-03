@@ -45,7 +45,7 @@ public class SourceRegistryService {
     @Transactional
     public NewsSourceDto create(NewsSourceRequest r, UUID actor) {
         validate(r, null);
-        NewsSource s = repository.save(new NewsSource(r.name().strip(), r.baseUrl().strip(), r.feedUrl().strip(),
+        NewsSource s = repository.save(new NewsSource(r.name().strip(), r.baseUrl().strip(), blankToNull(r.feedUrl()),
                 r.sourceType(), ContentLanguage.fromCode(r.language()), r.primarySource(), r.reliabilityTier(),
                 blankToNull(r.reliabilityNotes()), r.enabled(), r.fetchIntervalMinutes(), r.requiresKeywordMatch()));
         audit.record(actor, ActorType.USER, "NEWS_SOURCE_CREATED", "news_sources", s.getId(), null, toDto(s), null);
@@ -57,7 +57,7 @@ public class SourceRegistryService {
         NewsSource s = repository.findById(id).orElseThrow(() -> new NotFoundException("Source not found"));
         validate(r, id);
         NewsSourceDto before = toDto(s);
-        s.update(r.name().strip(), r.baseUrl().strip(), r.feedUrl().strip(), r.sourceType(),
+        s.update(r.name().strip(), r.baseUrl().strip(), blankToNull(r.feedUrl()), r.sourceType(),
                 ContentLanguage.fromCode(r.language()), r.primarySource(), r.reliabilityTier(),
                 blankToNull(r.reliabilityNotes()), r.enabled(), r.fetchIntervalMinutes(), r.requiresKeywordMatch());
         audit.record(actor, ActorType.USER, "NEWS_SOURCE_UPDATED", "news_sources", id, before, toDto(s), null);
@@ -66,7 +66,7 @@ public class SourceRegistryService {
 
     void validate(NewsSourceRequest r, UUID selfId) {
         checkUrl(r.baseUrl(), "Website");
-        checkUrl(r.feedUrl(), "Feed");
+        if (r.feedUrl() != null && !r.feedUrl().isBlank()) checkUrl(r.feedUrl(), "Feed");
         repository.findByBaseUrl(r.baseUrl().strip()).ifPresent(existing -> {
             if (!existing.getId().equals(selfId)) throw new BadRequestException("A source with this website URL already exists");
         });

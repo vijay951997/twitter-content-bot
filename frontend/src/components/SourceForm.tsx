@@ -37,7 +37,7 @@ export function SourceForm({ initial, onSave, onCancel }: {
         <label className="text-sm"><span className="font-medium">Website URL</span>
           <input required className={input} value={s.baseUrl} onChange={(e) => set('baseUrl', e.target.value)} placeholder="https://" /></label>
         <label className="text-sm"><span className="font-medium">RSS / Atom feed URL</span>
-          <input required className={input} value={s.feedUrl} onChange={(e) => set('feedUrl', e.target.value)} placeholder="https://…/rss" /></label>
+          <input className={input} value={s.feedUrl ?? ''} onChange={(e) => set('feedUrl', e.target.value || null)} placeholder="https://…/rss (leave empty for a manual source)" /></label>
         <label className="text-sm"><span className="font-medium">Language</span>
           <select className={input} value={s.language} onChange={(e) => set('language', e.target.value as LanguageCode)}>
             {(['ta', 'en', 'mixed'] as LanguageCode[]).map((l) => <option key={l} value={l}>{LANGUAGE_LABELS[l]}</option>)}

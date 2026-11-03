@@ -107,8 +107,9 @@ public class DraftGenerationService {
         List<String> urls = cleanUrls(request.sourceUrls());
         String notes = blankToNull(request.sourceNotes());
         List<SourceLink> links = urls.stream().map(u -> new SourceLink(u, null, null)).toList();
-        return run(request.slot(), request.language(), blankToNull(request.topic()), notes, links,
-                notes == null ? VerificationStatus.UNVERIFIED : VerificationStatus.PARTIALLY_VERIFIED, false, actorId);
+        VerificationStatus ceiling = notes == null ? VerificationStatus.UNVERIFIED
+                : (officialLink(urls) ? VerificationStatus.VERIFIED : VerificationStatus.PARTIALLY_VERIFIED);
+        return run(request.slot(), request.language(), blankToNull(request.topic()), notes, links, ceiling, false, actorId);
     }
 
     /** Drafts from an analysed article, using only its verified or attributable claims. */
@@ -174,6 +175,21 @@ public class DraftGenerationService {
         return r;
     }
 
+    /**
+     * True when a supplied link is on the website of a registered official primary source (tier 1, e.g. TN DIPR).
+     * Facts the user pasted from such a release may then be presented as verified; the reviewer still approves.
+     */
+    boolean officialLink(List<String> urls) {
+        List<String> official = newsSources.findAll().stream()
+                .filter(s -> s.isPrimarySource() && s.getReliabilityTier() == 1)
+                .map(s -> com.ai.xbot.news.UrlNormalizer.domain(s.getBaseUrl())).filter(d -> !d.isBlank()).toList();
+        for (String u : urls) {
+            String d = com.ai.xbot.news.UrlNormalizer.domain(u);
+            for (String o : official) if (d.equals(o) || d.endsWith("." + o)) return true;
+        }
+        return false;
+    }
+
     Optional<UUID> pickArticle(PostSlot slot, Set<UUID> exclude) {
         Instant since = Instant.now(clock).minus(Duration.ofHours(36));
         for (NewsArticle a : articles.findUnusedAnalysed(ArticleBrief.categoriesFor(slot), since, PageRequest.of(0, 10))) {
@@ -200,22 +216,23 @@ public class DraftGenerationService {
 
         checkRateLimit(1);
         recordRequest(actorId, slot, language, notes != null);
+        com.ai.xbot.dto.ContentFocusDto focus = settings.getFocus();
 
         AiGenerationResult result;
         try {
-            result = ai.generate(new AiGenerationRequest(prompts.systemPrompt(),
-                    prompts.userPrompt(slot, language, topic, notes, urls, variations)));
+            result = ai.generate(new AiGenerationRequest(prompts.systemPrompt(focus),
+                    prompts.userPrompt(slot, focus, language, topic, notes, urls, variations)));
         } catch (AiServiceException e) {
             tx.executeWithoutResult(s -> audit.record(actorId, ActorType.USER, "AI_GENERATION_FAILED",
                     "generated_posts", null, null, Map.of("kind", e.getKind().name()), e.getMessage()));
             throw e;
         }
-        return save(slot, language, topic, notes, urls, links, ceiling, articleBased, result, actorId);
+        return save(slot, language, topic, notes, urls, links, ceiling, articleBased, result, focus.maxHashtags(), actorId);
     }
 
     private GenerationResultDto save(PostSlot slot, ContentLanguage language, String topic, String notes,
                                      List<String> urls, List<SourceLink> links, VerificationStatus ceiling,
-                                     boolean articleBased, AiGenerationResult result, UUID actorId) {
+                                     boolean articleBased, AiGenerationResult result, int maxHashtags, UUID actorId) {
         return tx.execute(status -> {
             int lookbackDays = settings.getContent().duplicateLookbackDays();
             Instant since = Instant.now(clock).minus(Duration.ofDays(lookbackDays));
@@ -233,7 +250,7 @@ public class DraftGenerationService {
             }
 
             for (AiGenerationResult.AiDraft d : result.drafts()) {
-                DraftValidator.Outcome outcome = DraftValidator.validate(d, language, slot, urls, ceiling);
+                DraftValidator.Outcome outcome = DraftValidator.validate(d, language, slot, urls, ceiling, maxHashtags);
                 if (outcome instanceof Rejected r) {
                     discarded.add(new Discarded(slot.name(), r.reason(), preview(d.content())));
                     continue;

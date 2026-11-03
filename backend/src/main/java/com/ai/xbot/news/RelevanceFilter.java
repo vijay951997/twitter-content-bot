@@ -62,6 +62,17 @@ public final class RelevanceFilter {
         return new Result(relevant, matched, category == null ? "PUBLIC_INTEREST" : category);
     }
 
+    /** True when the text contains any of the user's focus keywords (same whole-word rule for short Latin terms). */
+    public static boolean matchesFocus(String title, String excerpt, List<String> focusKeywords) {
+        String text = " " + Normalizer.normalize((title + " " + (excerpt == null ? "" : excerpt)), Normalizer.Form.NFC)
+                .toLowerCase(Locale.ROOT).replaceAll("\\s+", " ") + " ";
+        for (String k : focusKeywords) {
+            String term = Normalizer.normalize(k, Normalizer.Form.NFC).toLowerCase(Locale.ROOT).strip();
+            if (!term.isEmpty() && contains(text, term)) return true;
+        }
+        return false;
+    }
+
     /** Short Latin acronyms must match as whole words (so "dmk" doesn't match inside other words). */
     private static boolean contains(String text, String term) {
         boolean latinShort = term.length() <= 5 && term.chars().allMatch(c -> c < 128);

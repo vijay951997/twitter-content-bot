@@ -63,9 +63,10 @@ public class NewsController {
     public PageDto<ArticleDto> articles(@RequestParam(required = false) AnalysisStatus status,
                                         @RequestParam(defaultValue = "true") boolean relevantOnly,
                                         @RequestParam(required = false) UUID sourceId,
+                                        @RequestParam(defaultValue = "false") boolean focusOnly,
                                         @RequestParam(defaultValue = "0") int page,
                                         @RequestParam(defaultValue = "20") int size) {
-        return queries.list(status, relevantOnly, sourceId, page, size);
+        return queries.list(status, relevantOnly, sourceId, focusOnly, page, size);
     }
 
     @GetMapping("/articles/{id}")

@@ -72,6 +72,9 @@ public class NewsArticle {
     @Column(name = "analysis_error", length = 500)
     private String analysisError;
 
+    @Column(name = "focus_match", nullable = false)
+    private boolean focusMatch;
+
     @CreationTimestamp
     @Column(name = "created_at", nullable = false, updatable = false)
     private Instant createdAt;
@@ -112,6 +115,9 @@ public class NewsArticle {
     }
 
     public void markVerified(Instant at) { this.verifiedAt = at; }
+
+    public void setFocusMatch(boolean focusMatch) { this.focusMatch = focusMatch; }
+    public boolean isFocusMatch() { return focusMatch; }
 
     public UUID getId() { return id; }
     public UUID getSourceId() { return sourceId; }

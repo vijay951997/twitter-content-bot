@@ -6,7 +6,7 @@ import jakarta.validation.constraints.*;
 public record NewsSourceRequest(
         @NotBlank @Size(max = 150) String name,
         @NotBlank @Size(max = 500) String baseUrl,
-        @NotBlank @Size(max = 500) String feedUrl,
+        @Size(max = 500) String feedUrl,   // optional: manual sources (e.g. TN DIPR) have no feed
         @NotNull SourceType sourceType,
         @NotBlank @Pattern(regexp = "ta|en|mixed") String language,
         boolean primarySource,

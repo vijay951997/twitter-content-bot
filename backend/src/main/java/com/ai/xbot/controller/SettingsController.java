@@ -29,6 +29,17 @@ public class SettingsController {
         return settingsService.updateSchedule(body, user.getId());
     }
 
+    @GetMapping("/focus")
+    public com.ai.xbot.dto.ContentFocusDto focus() {
+        return settingsService.getFocus();
+    }
+
+    @PutMapping("/focus")
+    public com.ai.xbot.dto.ContentFocusDto updateFocus(@Valid @RequestBody com.ai.xbot.dto.ContentFocusDto body,
+                                                       @AuthenticationPrincipal AuthenticatedUser user) {
+        return settingsService.updateFocus(body, user.getId());
+    }
+
     @GetMapping("/publishing")
     public com.ai.xbot.dto.PublishingSettingsDto publishing() {
         return new com.ai.xbot.dto.PublishingSettingsDto(settingsService.isPublishingEnabled());
