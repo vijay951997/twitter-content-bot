@@ -35,6 +35,7 @@ public class DraftMapper {
                 p.getQualityEstimate(), p.getProposedPublishAt(), p.getCreatedAt(), p.getTopic(), p.getSourceNotes(),
                 sourceUrls, verified, unverified, p.getRiskFlags(), p.getDuplicateWarning(),
                 p.getWeightedLength() != null ? p.getWeightedLength() : XTextLength.weightedLength(p.getContent()),
-                XTextLength.MAX_WEIGHTED_LENGTH, p.getAiModel(), p.getPromptVersion(), p.getVariationGroupId());
+                XTextLength.MAX_WEIGHTED_LENGTH, p.getAiModel(), p.getPromptVersion(), p.getVariationGroupId(),
+                p.getVersion(), p.isEditedByHuman(), p.isSavedForLater(), p.getRejectionReason(), p.getParentPostId(), null);
     }
 }

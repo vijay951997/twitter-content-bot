@@ -28,5 +28,22 @@ public record DraftDto(
         int maxLength,
         String aiModel,
         String promptVersion,
-        UUID variationGroupId) {
+        UUID variationGroupId,
+        long version,
+        boolean editedByHuman,
+        boolean savedForLater,
+        String rejectionReason,
+        UUID parentPostId,
+        Publishing publishing) {
+
+    /** Scheduling / publishing state, when the draft has been approved. */
+    public record Publishing(String queueStatus, Instant scheduledAt, int attempts, String lastError,
+                             String xPostId, String xUrl, Instant publishedAt, String approvedBy, Instant approvedAt) {}
+
+    public DraftDto withPublishing(Publishing p) {
+        return new DraftDto(id, content, language, category, slot, status, verificationStatus, qualityEstimate,
+                proposedPublishAt, createdAt, topic, sourceNotes, sourceUrls, verifiedClaims, unverifiedClaims, riskFlags,
+                duplicateWarning, weightedLength, maxLength, aiModel, promptVersion, variationGroupId, version,
+                editedByHuman, savedForLater, rejectionReason, parentPostId, p);
+    }
 }

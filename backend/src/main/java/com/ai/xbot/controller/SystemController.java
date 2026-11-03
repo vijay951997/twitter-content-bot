@@ -13,25 +13,29 @@ public class SystemController {
 
     private final AppProperties properties;
     private final SettingsService settingsService;
+    private final com.ai.xbot.service.xaccount.XAccountService xAccounts;
 
-    public SystemController(AppProperties properties, SettingsService settingsService) {
+    public SystemController(AppProperties properties, SettingsService settingsService,
+                            com.ai.xbot.service.xaccount.XAccountService xAccounts) {
         this.properties = properties;
         this.settingsService = settingsService;
+        this.xAccounts = xAccounts;
     }
 
     /** Integration readiness. Reports only whether values are present, never the values. */
     @GetMapping("/status")
     public SystemStatusDto status() {
         boolean openAi = properties.openai() != null && properties.openai().configured();
-        boolean x = properties.x() != null && properties.x().configured();
+        var xs = xAccounts.status();
+        boolean x = xs.appConfigured() && xs.encryptionKeyConfigured();
         return new SystemStatusDto(
-                "0.3.0",
+                "0.5.0",
                 settingsService.getSchedule().timezone(),
                 openAi,
                 openAi ? properties.openai().model() : null,
                 x,
-                false, // X account connection arrives in Phase 5
+                xs.connected(),
                 settingsService.isPublishingEnabled(),
-                "PHASE_3");
+                "PHASE_5");
     }
 }

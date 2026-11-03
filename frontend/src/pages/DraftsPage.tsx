@@ -4,13 +4,16 @@ import { useApi } from '../hooks/useApi'
 import { GeneratePanel } from '../components/GeneratePanel'
 import { DraftCard } from '../components/DraftCard'
 import { ErrorBanner } from '../components/ErrorBanner'
-import type { ContentSettings, Draft, GenerationResult, Page, PostStatus, ScheduleSettings } from '../types/api'
+import { Link } from 'react-router-dom'
+import { useAuth } from '../hooks/useAuth'
+import type { ContentSettings, Draft, GenerationResult, Page, PostStatus, ScheduleSettings, SystemStatus } from '../types/api'
 
 const FILTERS: { value: '' | PostStatus; label: string }[] = [
   { value: '', label: 'All' },
   { value: 'GENERATED', label: 'New' },
   { value: 'UNDER_REVIEW', label: 'In review' },
-  { value: 'APPROVED', label: 'Approved' },
+  { value: 'SCHEDULED', label: 'Scheduled' },
+  { value: 'FAILED', label: 'Failed' },
   { value: 'REJECTED', label: 'Rejected' },
   { value: 'PUBLISHED', label: 'Published' },
 ]
@@ -18,6 +21,9 @@ const FILTERS: { value: '' | PostStatus; label: string }[] = [
 export function DraftsPage() {
   const content = useApi<ContentSettings>('/api/settings/content')
   const schedule = useApi<ScheduleSettings>('/api/settings/schedule')
+  const system = useApi<SystemStatus>('/api/system/status')
+  const { user } = useAuth()
+  const canReview = user?.role === 'ADMIN' || user?.role === 'REVIEWER'
   const [filter, setFilter] = useState<'' | PostStatus>('')
   const [drafts, setDrafts] = useState<Draft[]>([])
   const [page, setPage] = useState(0)
@@ -52,8 +58,15 @@ export function DraftsPage() {
     <div className="space-y-6">
       <header>
         <h1 className="text-2xl font-semibold">Drafts</h1>
-        <p className="text-sm text-muted">AI drafts waiting for your review. Nothing here is posted to X.</p>
+        <p className="text-sm text-muted">Review AI drafts. Nothing is posted to X until you approve it.</p>
       </header>
+
+      {system.data && (!system.data.xAccountConnected || !system.data.publishingEnabled) && (
+        <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
+          {!system.data.xAccountConnected ? 'X account not connected' : 'Publishing switch is off'}: approved posts will wait and won't be posted.{' '}
+          <Link to="/settings" className="font-medium underline">Open Settings</Link>
+        </div>
+      )}
 
       {content.data && <GeneratePanel enabledLanguages={content.data.enabledLanguages} onGenerated={onGenerated} />}
 
@@ -91,7 +104,11 @@ export function DraftsPage() {
       )}
 
       <div className="space-y-4">
-        {drafts.map((d) => <DraftCard key={d.id} draft={d} timezone={tz} />)}
+        {drafts.map((d) => (
+          <DraftCard key={d.id} draft={d} timezone={tz} canReview={canReview}
+                     onChange={(nd) => setDrafts((list) => list.map((x) => (x.id === nd.id ? nd : x)))}
+                     onRegenerated={onGenerated} />
+        ))}
       </div>
 
       {hasMore && (
@@ -100,7 +117,7 @@ export function DraftsPage() {
         </button>
       )}
 
-      <p className="text-xs text-muted">"Generate today's 3 drafts" uses the newest fact-checked article for each slot, or a discussion post when there is none. Approve, edit and reject actions arrive in Phase 4. Publishing to X arrives in Phase 5.</p>
+      <p className="text-xs text-muted">"Generate today's 3 drafts" uses the newest fact-checked article for each slot, or a discussion post when there is none. A post is sent to X only after you approve that exact text; editing it afterwards removes the approval.</p>
     </div>
   )
 }

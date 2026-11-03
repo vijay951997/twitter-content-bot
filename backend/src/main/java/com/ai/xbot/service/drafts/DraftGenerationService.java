@@ -143,6 +143,37 @@ public class DraftGenerationService {
         return new GenerationResultDto(created, discarded);
     }
 
+    /**
+     * New variations from the same inputs as an existing draft (same article, or same topic/notes/links).
+     * The original is cancelled if it was still waiting for review; new drafts point to it as parent.
+     */
+    public GenerationResultDto regenerate(UUID postId, UUID actorId) {
+        GeneratedPost original = posts.findById(postId).orElseThrow(() -> new NotFoundException("Draft not found"));
+        if (original.getStatus() != PostStatus.GENERATED && original.getStatus() != PostStatus.UNDER_REVIEW) {
+            throw new BadRequestException("Only drafts waiting for review can be regenerated");
+        }
+        List<PostSource> links = sources.findByPostIdIn(List.of(postId));
+        Optional<UUID> articleId = links.stream().map(PostSource::getArticleId).filter(Objects::nonNull).findFirst();
+        PostSlot slot = original.getSlot() == null ? PostSlot.EVENING : original.getSlot();
+        String lang = original.getLanguage().code();
+        GenerationResultDto r = articleId.isPresent()
+                ? generateFromArticle(articleId.get(), slot, lang, actorId)
+                : generate(new GenerateDraftRequest(slot, lang, original.getTopic(), original.getSourceNotes(),
+                        links.stream().map(PostSource::getSourceUrl).distinct().toList()), actorId);
+        if (!r.created().isEmpty()) {
+            tx.executeWithoutResult(s -> {
+                for (DraftDto d : r.created()) posts.findById(d.id()).ifPresent(n -> n.setParentPostId(postId));
+                GeneratedPost o = posts.findById(postId).orElseThrow();
+                if (o.getStatus() == PostStatus.GENERATED || o.getStatus() == PostStatus.UNDER_REVIEW) {
+                    o.transitionTo(PostStatus.CANCELLED);
+                    audit.record(actorId, ActorType.USER, "DRAFT_REGENERATED", "generated_posts", postId, null,
+                            Map.of("newDrafts", r.created().size()), null);
+                }
+            });
+        }
+        return r;
+    }
+
     Optional<UUID> pickArticle(PostSlot slot, Set<UUID> exclude) {
         Instant since = Instant.now(clock).minus(Duration.ofHours(36));
         for (NewsArticle a : articles.findUnusedAnalysed(ArticleBrief.categoriesFor(slot), since, PageRequest.of(0, 10))) {

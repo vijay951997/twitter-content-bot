@@ -92,10 +92,19 @@ public class SettingsService {
         return getContent();
     }
 
-    /** Master publishing switch. Read-only in Phase 1; becomes editable with the X integration (Phase 5). */
+    /** Master publishing switch. Even when on, only approved posts are published. */
     @Transactional(readOnly = true)
     public boolean isPublishingEnabled() {
         return Boolean.parseBoolean(value(PUBLISHING_ENABLED));
+    }
+
+    @Transactional
+    public boolean setPublishingEnabled(boolean enabled, UUID actorId) {
+        boolean before = isPublishingEnabled();
+        set(PUBLISHING_ENABLED, Boolean.toString(enabled), actorId);
+        auditService.record(actorId, ActorType.USER, enabled ? "PUBLISHING_ENABLED" : "PUBLISHING_DISABLED",
+                "application_settings", null, Map.of("enabled", before), Map.of("enabled", enabled), null);
+        return enabled;
     }
 
     /** Raw value of any setting, for settings without a typed accessor. */

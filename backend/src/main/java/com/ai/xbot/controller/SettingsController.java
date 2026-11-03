@@ -29,6 +29,17 @@ public class SettingsController {
         return settingsService.updateSchedule(body, user.getId());
     }
 
+    @GetMapping("/publishing")
+    public com.ai.xbot.dto.PublishingSettingsDto publishing() {
+        return new com.ai.xbot.dto.PublishingSettingsDto(settingsService.isPublishingEnabled());
+    }
+
+    @PutMapping("/publishing")
+    public com.ai.xbot.dto.PublishingSettingsDto updatePublishing(@Valid @RequestBody com.ai.xbot.dto.PublishingSettingsDto body,
+                                                                 @AuthenticationPrincipal AuthenticatedUser user) {
+        return new com.ai.xbot.dto.PublishingSettingsDto(settingsService.setPublishingEnabled(body.enabled(), user.getId()));
+    }
+
     @GetMapping("/content")
     public ContentSettingsDto content() {
         return settingsService.getContent();

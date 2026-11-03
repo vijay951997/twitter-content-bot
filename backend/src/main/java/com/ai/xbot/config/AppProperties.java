@@ -38,10 +38,19 @@ public record AppProperties(
         public long effectiveRetryBackoffMs() { return retryBackoffMs == null ? 1000L : retryBackoffMs; }
     }
 
-    public record X(String clientId, String clientSecret, String redirectUri) {
+    /**
+     * @param tokenEncryptionKey base64 of 32 random bytes (AES-256) used to encrypt X tokens at rest
+     * @param apiBaseUrl         X API base, e.g. https://api.x.com/2 (overridable for tests)
+     * @param authorizeUrl       X OAuth 2.0 authorize page
+     */
+    public record X(String clientId, String clientSecret, String redirectUri, String tokenEncryptionKey,
+                    String apiBaseUrl, String authorizeUrl) {
         public boolean configured() {
-            return clientId != null && !clientId.isBlank() && redirectUri != null && !redirectUri.isBlank();
+            return notBlank(clientId) && notBlank(clientSecret) && notBlank(redirectUri) && notBlank(tokenEncryptionKey);
         }
+        public String effectiveApiBaseUrl() { return notBlank(apiBaseUrl) ? apiBaseUrl : "https://api.x.com/2"; }
+        public String effectiveAuthorizeUrl() { return notBlank(authorizeUrl) ? authorizeUrl : "https://x.com/i/oauth2/authorize"; }
+        private static boolean notBlank(String s) { return s != null && !s.isBlank(); }
     }
 
     public record Cors(String allowedOrigins) {}

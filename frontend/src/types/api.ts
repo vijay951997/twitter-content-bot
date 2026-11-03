@@ -100,6 +100,52 @@ export interface Draft {
   aiModel: string | null
   promptVersion: string | null
   variationGroupId: string | null
+  version: number
+  editedByHuman: boolean
+  savedForLater: boolean
+  rejectionReason: string | null
+  parentPostId: string | null
+  publishing: {
+    queueStatus: string | null
+    scheduledAt: string | null
+    attempts: number
+    lastError: string | null
+    xPostId: string | null
+    xUrl: string | null
+    publishedAt: string | null
+    approvedBy: string | null
+    approvedAt: string | null
+  } | null
+}
+
+export interface HistoryEntry {
+  at: string
+  action: string
+  actor: string
+  details: string | null
+  oldValue: string | null
+  newValue: string | null
+}
+
+export interface XAccountStatus {
+  appConfigured: boolean
+  encryptionKeyConfigured: boolean
+  connected: boolean
+  status: 'ACTIVE' | 'EXPIRED' | 'REVOKED' | 'NOT_CONNECTED'
+  username: string | null
+  connectedSince: string | null
+  missing: string | null
+}
+
+export interface NotificationItem {
+  id: string
+  type: string
+  title: string
+  message: string | null
+  entityType: string | null
+  entityId: string | null
+  read: boolean
+  createdAt: string
 }
 
 export interface GenerateRequest {

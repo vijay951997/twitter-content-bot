@@ -1,5 +1,5 @@
 import { useApi } from '../hooks/useApi'
-import type { Overview, SystemStatus } from '../types/api'
+import type { NotificationItem, Overview, SystemStatus } from '../types/api'
 import { StatCard } from '../components/StatCard'
 import { ErrorBanner } from '../components/ErrorBanner'
 
@@ -15,6 +15,7 @@ function Check({ ok, label, detail }: { ok: boolean; label: string; detail?: str
 export function OverviewPage() {
   const overview = useApi<Overview>('/api/dashboard/overview')
   const status = useApi<SystemStatus>('/api/system/status')
+  const notes = useApi<{ unread: number; items: NotificationItem[] }>('/api/notifications?limit=8')
   const o = overview.data
   const s = status.data
 
@@ -73,6 +74,23 @@ export function OverviewPage() {
           <p className="mt-3 text-xs text-muted">Build stage: {s?.phase.replace('_', ' ') ?? '–'} · Timezone {s?.timezone ?? '–'}</p>
         </div>
       </section>
+
+      {notes.data && notes.data.items.length > 0 && (
+        <section className="rounded-xl border border-line bg-white p-5">
+          <h2 className="font-semibold">Recent activity</h2>
+          <ul className="mt-2 divide-y divide-line">
+            {notes.data.items.map((n) => (
+              <li key={n.id} className="py-2 text-sm">
+                <span className={n.type === 'PUBLISH_SUCCESS' ? 'text-emerald-700' : n.type.includes('FAIL') || n.type === 'OAUTH_EXPIRING' ? 'text-red-700' : ''}>
+                  {n.title}
+                </span>
+                {n.message && <span className="text-muted"> · {n.message}</span>}
+                <span className="ml-2 text-xs text-muted">{new Date(n.createdAt).toLocaleString('en-IN', { timeZone: s?.timezone ?? 'Asia/Kolkata' })}</span>
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
     </div>
   )
 }

@@ -12,7 +12,8 @@ import org.testcontainers.containers.PostgreSQLContainer;
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.MOCK)
 @TestPropertySource(properties = {
         "app.admin.username=it-admin",
-        "app.admin.password=it-admin-password-123"
+        "app.admin.password=it-admin-password-123",
+        "app.scheduling.enabled=false"
 })
 public abstract class AbstractPostgresIT {
 

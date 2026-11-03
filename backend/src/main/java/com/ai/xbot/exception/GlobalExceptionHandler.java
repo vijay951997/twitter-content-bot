@@ -52,6 +52,11 @@ public class GlobalExceptionHandler {
         return build(HttpStatus.BAD_REQUEST, "Validation failed", req, fields);
     }
 
+    @ExceptionHandler(ConflictException.class)
+    public ResponseEntity<ApiError> conflict(ConflictException ex, HttpServletRequest req) {
+        return build(HttpStatus.CONFLICT, ex.getMessage(), req, List.of());
+    }
+
     @ExceptionHandler(InvalidStateTransitionException.class)
     public ResponseEntity<ApiError> invalidTransition(InvalidStateTransitionException ex, HttpServletRequest req) {
         log.warn("Rejected status transition {} -> {} on {}", ex.getFrom(), ex.getTo(), req.getRequestURI());

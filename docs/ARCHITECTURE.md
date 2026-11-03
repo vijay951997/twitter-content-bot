@@ -2,7 +2,7 @@
 
 Human-in-the-loop platform that drafts Tamil Nadu politics and governance posts with AI, checks them against sources, and publishes to X **only after explicit human approval**.
 
-Status: **Phase 3 complete**: foundation, auth, settings, dashboard, AI draft generation, news discovery and cross-source fact-checking. Migrations V2 and V3 added draft review fields and news pipeline fields.
+Status: **Phases 1–5 complete**: foundation, AI drafting, news fact-checking, human approval workflow and X publishing. Migrations V2–V4 extend the original schema.
 
 ---
 
@@ -302,14 +302,28 @@ Base path `/api`. All endpoints except login, CSRF priming and health require a 
 | POST | `/api/news/articles/{id}/verify` | ADMIN/REVIEWER + CSRF | Re-check claims against newer reports |
 | POST | `/api/news/articles/{id}/draft` | ADMIN/REVIEWER + CSRF | Body `{slot?, language?}`. Draft from verified/attributable claims only |
 
+| PUT | `/api/drafts/{id}` | ADMIN/REVIEWER + CSRF | Body `{content, version}`. Edit; invalidates any approval |
+| POST | `/api/drafts/{id}/approve` | ADMIN/REVIEWER + CSRF | Body `{version, publishAt?, publishNow, acknowledgeWarnings, comment?}`. Approve this exact text and schedule it |
+| POST | `/api/drafts/{id}/reject` | ADMIN/REVIEWER + CSRF | Body `{version, reason?}` |
+| POST | `/api/drafts/{id}/unschedule` | ADMIN/REVIEWER + CSRF | Body `{version}`. Back to review; approval invalidated |
+| POST | `/api/drafts/{id}/retry` | ADMIN/REVIEWER + CSRF | Retry a FAILED post under its still-valid approval |
+| POST | `/api/drafts/{id}/cancel` | ADMIN/REVIEWER + CSRF | Give up on a FAILED post |
+| POST | `/api/drafts/{id}/regenerate` | ADMIN/REVIEWER + CSRF | New variations from the same inputs; original cancelled |
+| POST | `/api/drafts/{id}/save-for-later?saved=` | ADMIN/REVIEWER + CSRF | Bookmark a draft |
+| GET | `/api/drafts/{id}/history` | session | Audit trail for one draft |
+| GET | `/api/x/status` | session | Connection state (never tokens) |
+| GET | `/api/x/connect` | ADMIN | 302 to X's consent page (PKCE S256, state in session) |
+| GET | `/api/x/callback` | ADMIN | X redirects here; 302 back to `/settings?x=connected` or `?x=error&reason=…` |
+| POST | `/api/x/disconnect` | ADMIN + CSRF | Revoke tokens at X and delete them locally |
+| GET/PUT | `/api/settings/publishing` | session / ADMIN + CSRF | Master publishing switch `{enabled}` |
+| GET | `/api/notifications` | session | Recent dashboard notifications |
+
 AI errors map to: not configured → 503, bad key → 502, rate limit/quota → 429, timeout → 504, refusal → 422.
 
 Planned endpoints by phase:
 
 | Phase | Endpoints |
 |---|---|
-| 4 | `PUT /api/drafts/{id}` (edit), `POST /api/drafts/{id}/approve`, `/reject`, `/regenerate`, `/save-for-later`, `GET /api/drafts/{id}/history` |
-| 5 | `GET /api/x/connect` (PKCE start), `GET /api/x/callback`, `GET /api/x/account`, `DELETE /api/x/account` (revoke), `GET /api/publishing/queue` |
 | 6 | `GET /api/notifications`, `POST /api/notifications/{id}/read`, `GET /api/analytics/summary`, `GET /api/analytics/posts` |
 
 ## 7. AI draft generation (Phase 2)
@@ -362,17 +376,42 @@ flowchart TD
 - **Social media.** x.com, Facebook, Instagram, YouTube, Telegram, WhatsApp, Reddit, blog platforms etc. can't be registered as sources.
 - **Background work** (`NewsScheduler`) is off by default, runs at most every 5 minutes, honours per-source intervals with exponential backoff after failures, and takes a PostgreSQL advisory lock so only one instance runs a cycle. It never drafts or publishes.
 
-## 9. Security
+## 9. Approval and publishing (Phases 4–5)
+
+```mermaid
+sequenceDiagram
+    participant U as Reviewer
+    participant R as ReviewService
+    participant DB as PostgreSQL
+    participant P as Publisher (every 30 s)
+    participant X as X API v2
+    U->>R: approve (version, publish time)
+    R->>DB: post_approvals (decided_by, content hash) + publishing_queue + status SCHEDULED
+    Note over U,R: Edit later → approval invalidated, queue cancelled, back to UNDER_REVIEW
+    P->>DB: advisory lock · SELECT … FOR UPDATE SKIP LOCKED · LOCKED
+    P->>DB: re-check: SCHEDULED, live approval, hash(text) = approved hash, switch on, not already published
+    P->>DB: status PUBLISHING (optimistic lock)
+    P->>X: POST /2/tweets (Bearer token, refreshed once on 401)
+    X-->>P: data.id
+    P->>DB: published_posts (UNIQUE post_id) · PUBLISHED · queue DONE · audit · notification
+```
+
+- **Retries.** 429, 5xx and network errors retry after 1, 2, 4, 8 and 16 minutes, or after `Retry-After`. Other errors, including duplicate content and credits exhausted (402), fail immediately and notify you.
+- **Missed window.** A post more than 60 minutes late (`publishing.missed_window_minutes`) is not sent; it returns to review and its approval is invalidated.
+- **Crash safety.** If a worker dies after moving a post to PUBLISHING, the post is marked FAILED with "check your X profile before retrying". It is never resent automatically. A worker that dies before PUBLISHING simply retries.
+- **Tokens.** OAuth 2.0 Authorization Code + PKCE (S256), confidential client (HTTP Basic at the token endpoint), scopes `tweet.read tweet.write users.read offline.access`. Tokens are AES-256-GCM encrypted with `APP_TOKEN_ENCRYPTION_KEY`, refreshed 5 minutes before expiry, rotated refresh tokens kept, and revoked at X on disconnect.
+
+## 10. Security
 
 - Session login (BCrypt cost 12), session-fixation protection, HTTP-only `SameSite=Lax` cookie, `secure` flag via `SESSION_COOKIE_SECURE`.
 - CSRF via cookie/header pair; CSP and `X-Frame-Options: DENY` on both nginx and API.
 - Roles: `ADMIN` (edit settings, approve), `REVIEWER` (approve — Phase 4), `VIEWER` (read only).
 - First admin is created from `APP_ADMIN_USERNAME` / `APP_ADMIN_PASSWORD` only when no users exist; there is no default password.
 - Secrets live only in environment variables. Logs never include passwords or tokens; `/api/system/status` returns booleans only.
-- Phase 5 adds AES-GCM encryption of X tokens at rest with a key from `APP_TOKEN_ENCRYPTION_KEY`, minimum scopes (`tweet.read tweet.write users.read offline.access`), and token revocation on disconnect.
+- X tokens are encrypted at rest with AES-256-GCM (`APP_TOKEN_ENCRYPTION_KEY`); minimum scopes; revoked on disconnect.
 
-## 10. Decisions and open points
+## 11. Decisions and open points
 
-- **X API access tier.** Posting and reading metrics depend on the X developer plan you hold; this was not assumed. Phase 5 will check the current plan limits and document them before implementing.
+- **X API pricing.** X uses pay-per-use credits: about $0.015 per post, and about $0.20 for a post containing a link. The approval screen warns about links.
 - **Fact-checking honesty.** AI-assisted verification is labelled as assistance; it is never shown as independent confirmation. Only claims with stored supporting URLs can be `VERIFIED`.
 - **Single instance first.** The publishing lock uses PostgreSQL row locking (`SELECT … FOR UPDATE SKIP LOCKED`) plus the unique constraints above, so multiple instances are safe without Redis.

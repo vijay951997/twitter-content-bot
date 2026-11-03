@@ -11,9 +11,9 @@ AI-assisted drafting and publishing for a personal X account, focused on Tamil N
 | 1 | Spring Boot, PostgreSQL, full Flyway schema, auth, settings, audit, React dashboard, Docker | **Done** |
 | 2 | OpenAI integration, prompt templates, Tamil/English/Tanglish drafts, validation, duplicate checks, draft persistence | **Done** |
 | 3 | News discovery, source registry, robots.txt-aware fetching, AI claim extraction, cross-source verification, drafts from verified news | **Done** |
-| 4 | Approve / reject / edit / regenerate workflow, audit history | Next |
-| 5 | X OAuth 2.0 PKCE, publishing queue, retries, idempotency | |
-| 6 | Scheduler, notifications, analytics | |
+| 4 | Approve / reject / edit / regenerate workflow, audit history | **Done** |
+| 5 | X OAuth 2.0 PKCE, encrypted tokens, publishing queue, retries, idempotency | **Done** |
+| 6 | Daily auto-drafting scheduler, notifications UI, analytics | Next |
 | 7 | Security review, hardening, production docs | |
 
 ## Stack
@@ -64,9 +64,9 @@ npm run dev        # http://localhost:5173
 
 ```bash
 cd backend
-mvn test           # unit tests (101)
-mvn verify         # unit + integration tests on real PostgreSQL via Testcontainers (131 total; needs Docker)
-                   # OpenAI and news feeds are replaced by local stub servers — tests never touch the internet
+mvn test           # unit tests (107)
+mvn verify         # unit + integration tests on real PostgreSQL via Testcontainers (152 total; needs Docker)
+                   # OpenAI, news feeds and the X API are replaced by local stub servers — tests never touch the internet
 
 cd frontend
 npm test           # vitest
@@ -81,7 +81,7 @@ What the critical tests cover today:
 - Database refuses a queue entry without an approval, a second "published" row for the same post, a second live approval, and any edit or delete of audit history.
 - API rejects unauthenticated calls, logins and writes without CSRF, invalid schedules and language mixes; settings changes are audited; system status never exposes secrets.
 
-The remaining negative scenarios in the spec (HTTP 429/401 from X, OpenAI timeouts, scheduler running twice, restarts with pending posts) are tested in the phases that introduce those integrations.
+All 12 critical negative scenarios from the spec are covered by automated tests: unapproved post, edit after approval (including direct database tampering), rejected post, duplicate publish, X 429, X 401 / expired token, OpenAI timeout, unavailable news source, conflicting sources, publisher running twice at once, and restart with posts mid-send.
 
 ## Configuration
 
@@ -139,6 +139,22 @@ The AI only judges whether two reports say the same thing; the status comes from
 
 Automatic fetching and analysis are **off** by default. Turn them on with the settings `news.auto_fetch_enabled` and `news.auto_analyse_enabled`; analysis uses OpenAI credits and is capped by `ai.max_analyses_per_hour` (default 60).
 
+## Reviewing and posting to X (Phases 4 and 5)
+
+**One-time setup**
+1. Create an X developer app at console.x.com: Read and write, *Web App, Automated App or Bot*, callback `http://localhost:3000/api/x/callback`.
+2. Put `X_CLIENT_ID`, `X_CLIENT_SECRET`, `X_REDIRECT_URI` and a new `APP_TOKEN_ENCRYPTION_KEY` in `.env` (see `.env.example` for the one-line key generator), then `docker compose up -d --force-recreate backend`.
+3. Open the dashboard at **http://localhost:3000**, use the same host as the callback, then go to **Settings → Connect X account**. You approve on x.com; the app never sees your password. Tokens are stored AES-256-GCM encrypted.
+4. Turn on the **Publishing switch** when you're ready.
+
+**Each draft**
+- **Edit**, then **Approve & schedule** (a time in IST, or *Post now*), **Reject**, **Regenerate** or **Save for later**.
+- Approval covers the exact text: editing afterwards removes the approval and the schedule.
+- You must tick "I've checked these" when a draft has warnings: unverified claims, risk flags, your own edits, similarity to an earlier post, or a link (links cost about 13× more per post on X).
+- The publisher runs every 30 seconds. Before sending, it re-checks that the approval is still valid, that the text matches the approved text, and that the publishing switch is on.
+- Temporary X errors (429, 5xx) retry with backoff. A post that misses its time by more than an hour goes back to review instead of posting late.
+- **History** on each draft shows who generated, edited, approved and published it.
+
 ## Upgrading an existing install
 
 Extract the new zip over your existing folder (keep your `.env`), then run:
@@ -152,7 +168,7 @@ Database changes apply automatically on startup (Flyway), and existing data is k
 ## External services you will need
 
 - **OpenAI API key** (Phase 2).
-- **X developer account and app** with OAuth 2.0 enabled (Phase 5). Posting and metrics access depend on your X API plan; check the current plan limits on the X developer portal before Phase 5. The app never asks for your X password and never automates the X website.
+- **X developer account and app** with OAuth 2.0 enabled. X API access is pay-per-use: buy credits in the developer console (Billing → Credits). The app never asks for your X password and never automates the X website.
 
 ## Project layout
 

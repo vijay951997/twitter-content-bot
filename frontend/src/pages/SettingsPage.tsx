@@ -5,6 +5,7 @@ import { api, ApiError } from '../services/api'
 import { LANGUAGES, mixTotal } from '../services/settings'
 import type { ContentSettings, ScheduleSettings } from '../types/api'
 import { ErrorBanner } from '../components/ErrorBanner'
+import { XConnectionPanel } from '../components/XConnectionPanel'
 
 function errorText(e: unknown): string {
   if (e instanceof ApiError) {
@@ -55,11 +56,13 @@ export function SettingsPage() {
     <div className="space-y-6">
       <header>
         <h1 className="text-2xl font-semibold">Settings</h1>
-        <p className="text-sm text-muted">Posting schedule and language preferences. Every change is audited.</p>
+        <p className="text-sm text-muted">X account, publishing, schedule and languages. Every change is audited.</p>
       </header>
 
       <ErrorBanner message={err ?? schedule.error ?? content.error} />
       {msg && <div className="rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-700">{msg}</div>}
+
+      <XConnectionPanel canEdit={canEdit} />
 
       {sched && (
         <section className="rounded-xl border border-line bg-white p-5">

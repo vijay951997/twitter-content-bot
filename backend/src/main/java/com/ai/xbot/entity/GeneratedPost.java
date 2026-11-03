@@ -99,6 +99,12 @@ public class GeneratedPost {
     @Column(name = "weighted_length")
     private Integer weightedLength;
 
+    @Column(name = "rejection_reason", length = 500)
+    private String rejectionReason;
+
+    @Column(name = "edited_by_human", nullable = false)
+    private boolean editedByHuman;
+
     @Version
     private long version;
 
@@ -144,6 +150,23 @@ public class GeneratedPost {
         this.weightedLength = weightedLength;
     }
 
+    /** Replaces the text after a human edit. Callers must invalidate any approval first. */
+    public void editContent(String content, String contentHash, int weightedLength) {
+        this.content = content;
+        this.contentHash = contentHash;
+        this.weightedLength = weightedLength;
+        this.editedByHuman = true;
+    }
+
+    public void reject(String reason) {
+        transitionTo(PostStatus.REJECTED);
+        this.rejectionReason = reason;
+    }
+
+    public void setProposedPublishAt(Instant at) { this.proposedPublishAt = at; }
+    public void setSavedForLater(boolean saved) { this.savedForLater = saved; }
+    public void setParentPostId(UUID parentPostId) { this.parentPostId = parentPostId; }
+
     /** Moves the draft to a new status, rejecting any transition the workflow does not allow. */
     public void transitionTo(PostStatus target) {
         PostStatusPolicy.assertTransition(this.status, target);
@@ -172,5 +195,7 @@ public class GeneratedPost {
     public List<String> getRiskFlags() { return riskFlags; }
     public String getDuplicateWarning() { return duplicateWarning; }
     public Integer getWeightedLength() { return weightedLength; }
+    public String getRejectionReason() { return rejectionReason; }
+    public boolean isEditedByHuman() { return editedByHuman; }
     public long getVersion() { return version; }
 }

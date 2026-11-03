@@ -66,6 +66,9 @@ app:
     client-id: ${X_CLIENT_ID:}
     client-secret: ${X_CLIENT_SECRET:}
     redirect-uri: ${X_REDIRECT_URI:}
+    token-encryption-key: ${APP_TOKEN_ENCRYPTION_KEY:}
+    api-base-url: ${X_API_BASE_URL:https://api.x.com/2}
+    authorize-url: ${X_AUTHORIZE_URL:https://x.com/i/oauth2/authorize}
   cors:
     allowed-origins: ${APP_CORS_ALLOWED_ORIGINS:http://localhost:5173}
 
