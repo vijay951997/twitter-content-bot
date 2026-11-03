@@ -1,0 +1,14 @@
+@import "tailwindcss";
+
+@theme {
+  --font-sans: "Inter", "Noto Sans Tamil", ui-sans-serif, system-ui, sans-serif;
+  --color-ink: #14171a;
+  --color-muted: #5b6570;
+  --color-line: #e3e6ea;
+  --color-paper: #f7f8fa;
+  --color-accent: #1d4ed8;
+}
+
+body {
+  @apply bg-paper text-ink antialiased;
+}

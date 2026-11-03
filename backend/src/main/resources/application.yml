@@ -1,0 +1,75 @@
+spring:
+  application:
+    name: x-content-bot
+  datasource:
+    url: ${SPRING_DATASOURCE_URL:jdbc:postgresql://localhost:5432/xbot}
+    username: ${SPRING_DATASOURCE_USERNAME:xbot}
+    password: ${SPRING_DATASOURCE_PASSWORD:}
+  jpa:
+    open-in-view: false
+    hibernate:
+      ddl-auto: validate          # schema is owned by Flyway
+    properties:
+      hibernate:
+        jdbc.time_zone: UTC
+  flyway:
+    enabled: true
+    locations: classpath:db/migration
+    # Seed values for the first migration only (dashboard owns them afterwards)
+    placeholders:
+      app_timezone: ${APP_TIMEZONE:Asia/Kolkata}
+      schedule_morning: ${POST_SCHEDULE_MORNING:08:00}
+      schedule_afternoon: ${POST_SCHEDULE_AFTERNOON:13:00}
+      schedule_evening: ${POST_SCHEDULE_EVENING:19:00}
+      enabled_languages: ${ENABLED_LANGUAGES:ta,en}
+  jackson:
+    serialization:
+      write-dates-as-timestamps: false
+
+server:
+  port: ${SERVER_PORT:8080}
+  servlet:
+    session:
+      timeout: 8h
+      cookie:
+        http-only: true
+        same-site: lax
+        secure: ${SESSION_COOKIE_SECURE:false}   # set true behind HTTPS
+  error:
+    include-message: never
+    include-stacktrace: never
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics
+  endpoint:
+    health:
+      show-details: never
+      probes:
+        enabled: true
+
+app:
+  timezone: ${APP_TIMEZONE:Asia/Kolkata}
+  admin:
+    username: ${APP_ADMIN_USERNAME:}
+    password: ${APP_ADMIN_PASSWORD:}
+  openai:
+    api-key: ${OPENAI_API_KEY:}
+    model: ${OPENAI_MODEL:}
+    base-url: ${OPENAI_BASE_URL:https://api.openai.com/v1}
+    timeout-seconds: ${OPENAI_TIMEOUT_SECONDS:60}
+    max-retries: ${OPENAI_MAX_RETRIES:2}
+    retry-backoff-ms: 1000
+  x:
+    client-id: ${X_CLIENT_ID:}
+    client-secret: ${X_CLIENT_SECRET:}
+    redirect-uri: ${X_REDIRECT_URI:}
+  cors:
+    allowed-origins: ${APP_CORS_ALLOWED_ORIGINS:http://localhost:5173}
+
+logging:
+  level:
+    root: INFO
+    com.ai.xbot: INFO
