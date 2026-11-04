@@ -9,13 +9,36 @@ This moves the app from your PC to an always-on Linux server, reachable at `http
 
 ---
 
+## Free option: Oracle Cloud Always Free (ARM)
+
+1. **Sign up** at oracle.com/cloud/free. A card is needed for verification. Choose **India South (Hyderabad)** or **India West (Mumbai)** as the *home region*; it can't be changed later and free servers only run there.
+2. **Optional but recommended:** upgrade the account to **Pay-As-You-Go**, then add a **budget alert** (Billing → Budgets) of ₹100. Always Free resources stay free, and Oracle doesn't reclaim "idle" servers on paid accounts.
+3. **Create the VM:** Compute → Instances → Create.
+   - **Image:** Canonical Ubuntu 24.04.
+   - **Shape:** Ampere → `VM.Standard.A1.Flex`, **1 OCPU, 6 GB** (or 2 OCPU / 12 GB if you upgraded to Pay-As-You-Go).
+   - **Networking:** keep the default VCN and *assign a public IPv4 address*.
+   - **SSH keys:** *Generate a key pair* → **download the private key**.
+   - "Out of capacity"? Try another availability domain, or again later.
+4. **Open ports 80 and 443 in Oracle's network:** instance → Subnet → Security List → Add Ingress Rules: source `0.0.0.0/0`, TCP, destination port `80`; repeat for `443`.
+5. **Free domain:** at duckdns.org, sign in, add a subdomain such as `vijaydesk`, and set its IP to the VM's public IP. Your domain is then `vijaydesk.duckdns.org`.
+6. **SSH in from Windows (Command Prompt):**
+   ```bat
+   icacls C:\Users\vijay\Downloads\ssh-key.key /inheritance:r /grant:r "%USERNAME%":R
+   ssh -i C:\Users\vijay\Downloads\ssh-key.key ubuntu@<public-ip>
+   ```
+   The user is `ubuntu`. The `icacls` line fixes Windows' "unprotected private key" error.
+7. Continue with **step 2** below. `setup-ubuntu.sh` also opens 80/443 in the Oracle image's built-in firewall.
+
 ## 1. Point your domain at the server
 At your domain registrar or DNS provider, create an **A record**: `desk.yourdomain.in → <server public IP>`. Wait until `ping desk.yourdomain.in` shows the server IP. Caddy needs this before it can get a certificate.
 
 ## 2. Prepare the server (once)
 ```bash
 ssh youruser@<server-ip>
-git clone https://github.com/vijay951997/twitter-content-bot.git /opt/x-content-bot   # private repo: use a GitHub token or deploy key
+sudo mkdir -p /opt/x-content-bot && sudo chown $USER /opt/x-content-bot
+git clone https://github.com/vijay951997/twitter-content-bot.git /opt/x-content-bot
+# Private repo? Git asks for a username and password: use your GitHub username and a token from
+# github.com/settings/personal-access-tokens (fine-grained, this repo only, Contents: Read-only).
 cd /opt/x-content-bot
 bash deploy/setup-ubuntu.sh      # Docker, firewall (22/80/443 only), security updates, swap
 exit                             # log out and back in so the docker group applies
@@ -104,3 +127,4 @@ Database changes apply automatically.
 | X says the callback URL is invalid | The callback in the X console must match `X_REDIRECT_URI` exactly |
 | "Stored token can't be decrypted" | `APP_TOKEN_ENCRYPTION_KEY` differs from the one used when X was connected; reconnect X |
 | Build fails with "killed" | Not enough RAM; the setup script adds swap, or use a 4 GB server |
+| Oracle: site unreachable on 80/443 | Check the subnet Security List has ingress rules for 80 and 443, then rerun `bash deploy/setup-ubuntu.sh` |

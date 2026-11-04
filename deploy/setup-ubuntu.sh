@@ -21,6 +21,16 @@ sudo ufw allow 443/tcp
 sudo ufw allow 443/udp
 sudo ufw --force enable
 
+echo "== Oracle Cloud images: open 80/443 in the preinstalled iptables rules too"
+if [ -f /etc/iptables/rules.v4 ] && sudo iptables -S INPUT | grep -q "icmp-host-prohibited"; then
+  for port in 80 443; do
+    sudo iptables -C INPUT -p tcp --dport $port -m state --state NEW -j ACCEPT 2>/dev/null \
+      || sudo iptables -I INPUT 5 -p tcp --dport $port -m state --state NEW -j ACCEPT
+  done
+  sudo iptables -C INPUT -p udp --dport 443 -j ACCEPT 2>/dev/null || sudo iptables -I INPUT 5 -p udp --dport 443 -j ACCEPT
+  sudo netfilter-persistent save
+fi
+
 echo "== Automatic security updates"
 sudo dpkg-reconfigure -f noninteractive unattended-upgrades
 
