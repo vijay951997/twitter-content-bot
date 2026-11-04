@@ -35,8 +35,10 @@ import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
 public class SecurityConfig {
 
     @Bean
-    public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
+    public SecurityFilterChain securityFilterChain(HttpSecurity http, LoginThrottle throttle) throws Exception {
         http
+            .addFilterBefore(new LoginThrottleFilter(throttle),
+                    org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter.class)
             .cors(cors -> {})
             .csrf(csrf -> csrf
                     // Cookie readable by the SPA; the SPA echoes it in X-XSRF-TOKEN.

@@ -64,8 +64,8 @@ npm run dev        # http://localhost:5173
 
 ```bash
 cd backend
-mvn test           # unit tests (111)
-mvn verify         # unit + integration tests on real PostgreSQL via Testcontainers (157 total; needs Docker)
+mvn test           # unit tests (113)
+mvn verify         # unit + integration tests on real PostgreSQL via Testcontainers (159 total; needs Docker)
                    # OpenAI, news feeds and the X API are replaced by local stub servers — tests never touch the internet
 
 cd frontend
@@ -166,6 +166,10 @@ Automatic fetching and analysis are **off** by default. Turn them on with the se
 The honesty rules in the system prompt (`prompts/system-v2.txt`) can't be changed from the dashboard: facts only from sources, no invented figures or quotes, opinions written as opinions, and no personal attacks on opponents. Fact-checking stays neutral whatever the voice.
 
 **TN DIPR** is registered as an official manual source (it has no RSS feed). Paste a DIPR press release into Drafts with its `dipr.tn.gov.in` link: facts from it can then be marked Verified.
+
+## Running on a server
+
+See **[DEPLOY.md](DEPLOY.md)**: automatic HTTPS with Caddy, moving your data from your PC, daily backups, updates and security notes.
 
 ## Upgrading an existing install
 

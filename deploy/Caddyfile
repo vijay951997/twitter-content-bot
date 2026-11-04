@@ -1,0 +1,20 @@
+# Caddy obtains and renews the HTTPS certificate for {$DOMAIN} automatically.
+{
+	email {$ACME_EMAIL}
+}
+
+{$DOMAIN} {
+	encode zstd gzip
+
+	header {
+		Strict-Transport-Security "max-age=31536000"
+		-Server
+	}
+
+	# Optional: allow only your own IP addresses to reach the dashboard.
+	# Uncomment and replace with your home/office IPs (find yours at https://ifconfig.me).
+	# @outsiders not remote_ip 203.0.113.10 198.51.100.0/24
+	# respond @outsiders "Not available" 403
+
+	reverse_proxy frontend:80
+}

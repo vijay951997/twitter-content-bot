@@ -29,7 +29,7 @@ public class SystemController {
         var xs = xAccounts.status();
         boolean x = xs.appConfigured() && xs.encryptionKeyConfigured();
         return new SystemStatusDto(
-                "0.5.0",
+                "0.6.0",
                 settingsService.getSchedule().timezone(),
                 openAi,
                 openAi ? properties.openai().model() : null,

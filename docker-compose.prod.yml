@@ -1,0 +1,45 @@
+# Production override: adds Caddy in front for automatic HTTPS (Let's Encrypt) on your domain.
+# Use:  docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d --build
+# Needs DOMAIN and ACME_EMAIL in .env, and the domain's DNS A record pointing at this server.
+services:
+  backend:
+    environment:
+      SESSION_COOKIE_SECURE: "true"
+      SPRING_PROFILES_ACTIVE: prod        # JSON logs
+    logging:
+      driver: json-file
+      options: { max-size: "20m", max-file: "5" }
+
+  frontend:
+    logging:
+      driver: json-file
+      options: { max-size: "10m", max-file: "3" }
+
+  postgres:
+    logging:
+      driver: json-file
+      options: { max-size: "10m", max-file: "3" }
+
+  caddy:
+    image: caddy:2.8-alpine
+    restart: unless-stopped
+    depends_on:
+      - frontend
+    environment:
+      DOMAIN: ${DOMAIN:?Set DOMAIN in .env}
+      ACME_EMAIL: ${ACME_EMAIL:?Set ACME_EMAIL in .env}
+    ports:
+      - "80:80"
+      - "443:443"
+      - "443:443/udp"
+    volumes:
+      - ./deploy/Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    logging:
+      driver: json-file
+      options: { max-size: "10m", max-file: "3" }
+
+volumes:
+  caddy_data:
+  caddy_config:

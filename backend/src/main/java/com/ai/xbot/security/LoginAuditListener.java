@@ -21,17 +21,25 @@ public class LoginAuditListener {
     private final UserRepository userRepository;
     private final AuditService auditService;
     private final Clock clock;
+    private final LoginThrottle throttle;
 
-    public LoginAuditListener(UserRepository userRepository, AuditService auditService, Clock clock) {
+    public LoginAuditListener(UserRepository userRepository, AuditService auditService, Clock clock, LoginThrottle throttle) {
         this.userRepository = userRepository;
         this.auditService = auditService;
         this.clock = clock;
+        this.throttle = throttle;
+    }
+
+    private static String ip(org.springframework.security.core.Authentication a) {
+        return a.getDetails() instanceof org.springframework.security.web.authentication.WebAuthenticationDetails d
+                ? d.getRemoteAddress() : "unknown";
     }
 
     @EventListener
     @Transactional
     public void onSuccess(AuthenticationSuccessEvent event) {
         if (event.getAuthentication().getPrincipal() instanceof AuthenticatedUser principal) {
+            throttle.recordSuccess(ip(event.getAuthentication()), principal.getUsername());
             userRepository.findById(principal.getId()).ifPresent(u -> u.setLastLoginAt(Instant.now(clock)));
             auditService.record(principal.getId(), ActorType.USER, "LOGIN_SUCCESS", "users", principal.getId(),
                     null, null, null);
@@ -40,7 +48,9 @@ public class LoginAuditListener {
 
     @EventListener
     public void onFailure(AbstractAuthenticationFailureEvent event) {
-        // Username only; the submitted password is never logged.
-        log.warn("Login failed for username '{}'", event.getAuthentication().getName());
+        // Username and IP only; the submitted password is never logged.
+        String ip = ip(event.getAuthentication());
+        throttle.recordFailure(ip, event.getAuthentication().getName());
+        log.warn("Login failed for username '{}' from {}", event.getAuthentication().getName(), ip);
     }
 }

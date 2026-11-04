@@ -28,6 +28,10 @@ spring:
 
 server:
   port: ${SERVER_PORT:8080}
+  # Behind Caddy + nginx in production: honour X-Forwarded-Proto/Host/For so the app knows the request
+  # was HTTPS (secure cookies, same-origin checks) and sees the real client IP (login rate limiting).
+  # Safe because the backend port is bound to 127.0.0.1 and only reachable through the proxy.
+  forward-headers-strategy: framework
   servlet:
     session:
       timeout: 8h
@@ -52,6 +56,9 @@ management:
 
 app:
   timezone: ${APP_TIMEZONE:Asia/Kolkata}
+  login:
+    max-failures: ${APP_LOGIN_MAX_FAILURES:10}
+    window-minutes: ${APP_LOGIN_WINDOW_MINUTES:15}
   admin:
     username: ${APP_ADMIN_USERNAME:}
     password: ${APP_ADMIN_PASSWORD:}
