@@ -16,7 +16,8 @@ q() { "$@" 2>/dev/null || true; }
 
 say "SSH key for Cloud Shell -> server"
 mkdir -p ~/.ssh
-[ -f ~/.ssh/xbot ] || ssh-keygen -q -t ed25519 -N "" -f ~/.ssh/xbot -C xbot
+# Cloud Shell runs in FIPS mode, which refuses ED25519, so use RSA
+[ -f ~/.ssh/xbot ] || ssh-keygen -q -t rsa -b 4096 -N "" -f ~/.ssh/xbot -C xbot
 
 say "Network"
 VCN=$(q oci network vcn list -c "$C" --display-name xbot-vcn --lifecycle-state AVAILABLE --query 'data[0].id' --raw-output)
