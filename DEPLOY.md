@@ -11,6 +11,13 @@ This moves the app from your PC to an always-on Linux server, reachable at `http
 
 ## Free option: Oracle Cloud Always Free (ARM)
 
+**Fastest way:** in the Oracle console open **Cloud Shell** (the `>_` icon at the top right) and run:
+```bash
+bash <(curl -fsSL https://raw.githubusercontent.com/vijay951997/twitter-content-bot/main/deploy/oci-provision.sh) you@example.com
+```
+It creates the network (ports 22/80/443), the free ARM server, installs Docker, gets the code, prepares `.env` without secrets and builds the app. Your address is `https://<ip-with-dashes>.sslip.io`. Then continue at step 4 to add your secrets. The manual console steps below do the same thing by hand.
+
+
 1. **Sign up** at oracle.com/cloud/free. A card is needed for verification. Choose **India South (Hyderabad)** or **India West (Mumbai)** as the *home region*; it can't be changed later and free servers only run there.
 2. **Optional but recommended:** upgrade the account to **Pay-As-You-Go**, then add a **budget alert** (Billing → Budgets) of ₹100. Always Free resources stay free, and Oracle doesn't reclaim "idle" servers on paid accounts.
 3. **Create the VM:** Compute → Instances → Create.
