@@ -51,7 +51,7 @@ fi
 echo "VCN, gateway, routes, firewall (22/80/443) and subnet ready."
 
 say "Server"
-INST=$(q oci compute instance list -c "$C" --display-name xbot --lifecycle-state RUNNING --query 'data[0].id' --raw-output)
+INST=$(q oci compute instance list -c "$C" --display-name xbot --query 'data[?"lifecycle-state"!=`TERMINATED` && "lifecycle-state"!=`TERMINATING`] | [0].id' --raw-output)
 if [ -z "$INST" ] || [ "$INST" = "null" ]; then
   IMG=$(oci compute image list -c "$C" --operating-system "Canonical Ubuntu" --operating-system-version "24.04" \
         --shape VM.Standard.A1.Flex --sort-by TIMECREATED --sort-order DESC --query 'data[0].id' --raw-output)
@@ -87,7 +87,7 @@ echo "\$DOMAIN" > /var/log/xbot-setup.done
 CLOUDINIT
 
   AD_LIST=$(oci iam availability-domain list -c "$C" --query 'data[].name' --raw-output | tr -d '[]",' )
-  for attempt in $(seq 1 15); do
+  for attempt in $(seq 1 30); do
     for AD in $AD_LIST; do
       echo "Launching in $AD (attempt $attempt)..."
       if OUT=$(oci compute instance launch -c "$C" --availability-domain "$AD" --display-name xbot \
@@ -98,11 +98,19 @@ CLOUDINIT
         INST=$(echo "$OUT" | grep -o 'ocid1.instance[^" ]*' | head -1)
         break 2
       fi
-      echo "$OUT" | grep -qi "capacity" && echo "  Oracle is out of free ARM capacity there right now." || { echo "$OUT"; exit 1; }
+      # A launch that timed out while waiting may still have created the server: reuse it
+      INST=$(q oci compute instance list -c "$C" --display-name xbot --query 'data[?"lifecycle-state"!=`TERMINATED` && "lifecycle-state"!=`TERMINATING`] | [0].id' --raw-output)
+      if [ -n "$INST" ] && [ "$INST" != "null" ]; then
+        oci compute instance get --instance-id "$INST" --wait-for-state RUNNING >/dev/null; break 2
+      fi
+      INST=""
+      if echo "$OUT" | grep -qi "capacity"; then echo "  Oracle is out of free ARM capacity there right now."
+      elif echo "$OUT" | grep -qi "TooManyRequests\|\"status\": 429"; then echo "  Oracle is rate-limiting launch requests; waiting."
+      else echo "$OUT"; exit 1; fi
     done
-    echo "Retrying in 60 s..."; sleep 60
+    echo "Retrying in 90 s..."; sleep 90
   done
-  [ -n "${INST:-}" ] || { echo "Still out of capacity. Run this script again later; it resumes where it stopped."; exit 1; }
+  [ -n "${INST:-}" ] || { echo "Still no free capacity. Run this script again later; it resumes where it stopped."; exit 1; }
 fi
 
 IP=$(oci compute instance list-vnics --instance-id "$INST" --query 'data[0]."public-ip"' --raw-output)
